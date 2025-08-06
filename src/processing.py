@@ -9,6 +9,9 @@ def ave3d(array, param):
 def ave2d(array, param):
     return (array * param.dS).sum(['lon','lat']) / param.dS.sum(['lon','lat'])
 
+def avez(array, param):
+    return (array * param.dz).sum('z_l', skipna=False) / param.dz.sum('z_l')
+
 # def ave2d(array, param):
 #     return (array * param.dxt * param.dyt * param.mask_nan).sum(['xh','yh']) / (param.dxt * param.dyt * param.mask_nan).sum(['xh','yh'])
 
@@ -43,7 +46,7 @@ def read_woa():
     param = xr.open_dataset('../data-coarsegrain/param_coarse.nc')
     return ds, param
     
-def TnS2vec(dataset, woa, param, max_depth=None, center=False):
+def TnS2vec(dataset, woa, param, max_depth=None, center=False, average_z=False):
     """
     Convert TnS fields to vector field.
     
@@ -86,14 +89,20 @@ def TnS2vec(dataset, woa, param, max_depth=None, center=False):
     thetao_woa = thetao_woa / normalization_thetao
     so_woa = so_woa / normalization_so
 
-    # Incorporate square root of volume to use a conventional scalar product
-    thetao = thetao * np.sqrt(param.dV)
-    so = so * np.sqrt(param.dV)
-    thetao_woa = thetao_woa * np.sqrt(param.dV)
-    so_woa = so_woa * np.sqrt(param.dV)
+    if average_z:
+        thetao = avez(thetao, param) * np.sqrt(param.dS[0])
+        so = avez(so, param) * np.sqrt(param.dS[0])
+        thetao_woa = avez(thetao_woa, param) * np.sqrt(param.dS[0])
+        so_woa = avez(so_woa, param) * np.sqrt(param.dS[0])
+    else:
+        # Incorporate square root of volume to use a conventional scalar product
+        thetao = thetao * np.sqrt(param.dV)
+        so = so * np.sqrt(param.dV)
+        thetao_woa = thetao_woa * np.sqrt(param.dV)
+        so_woa = so_woa * np.sqrt(param.dV)
 
     # stack to a vector and remove nans
-    stack = lambda x: x.stack(i=['z_l','lat','lon'])
+    stack = lambda x: x.stack(i=x.dims)
 
     thetao = stack(thetao)
     so = stack(so)
