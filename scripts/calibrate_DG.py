@@ -66,16 +66,20 @@ for iteration in range(N_iterations):
 
     if os.path.exists(iteration_path):
         print('Folder with experiments exists')
-        ssh = lambda x: x.ea.isel(zi=0).sel(Time=slice(1825,3650)).mean('Time')
+        ssh = lambda x: x.e.isel(zi=0).sel(Time=slice(1825,3650)).mean('Time')
         ssh_fine = ssh(xr.open_mfdataset('/scratch/pp2681/mom6/Feb2022/bare/R64/output/ave_*.nc', decode_times=False)).coarsen({'xh': 64, 'yh': 64}).mean().compute()
 
         # 440 is the size of ssh vector
-        g_ens = np.zeros(440, params.shape[1])
+        g_ens = np.zeros([440, params.shape[1]])
         for ens_member, param in enumerate(params.T):
             try:
                 ssh_coarse = ssh(xr.open_mfdataset(f'{iteration_path}/ens-member-{ens_member:02d}/output/ave_*.nc', decode_times=False)).coarsen({'xh': 4, 'yh': 4}).mean().compute()
                 # Error vector of size 440
-                g_ens[:,ens_member] = (ssh_coarse - ssh_fine).values.ravel()
+                error = (ssh_coarse - ssh_fine).values.ravel()
+                if len(error) != 440:
+                    print('Wrong shape of the array')
+                    sys.exit(1)   # terminate immediately with error code
+                g_ens[:,ens_member] = error
                 print(f'Ensemble member {ens_member} succesfully ingested')
             except:
                 # Experiment is not ready or exploded or runtime error
@@ -97,6 +101,27 @@ for iteration in range(N_iterations):
 
         print('Experiments are scheduled')
         print('Putting in a queue resubmission script')
-        os.system('cd /home/pp2681/calibration/scripts; sbatch --mem=16GB --dependency=singleton --job-name=mom6 --wrap="python-jl calibrate_DG.py"')
+        os.system('cd /home/pp2681/calibration/scripts; sbatch --mem=16GB --dependency=singleton --export=NONE --job-name=mom6 --wrap="python-jl calibrate_DG.py"')
         print('Exiting the script')
         sys.exit(0)   # terminate immediately without error code
+
+print('Iterations are completed. Retrieve mean parameter vector and run long experiment.')
+params = Main.eval("get_ϕ_final(prior, vanilla_eki)")
+
+print('Final params mean/std', params.mean(-1), '/', params.std(-1))
+
+iteration_path = f'{base_path}/{optimization_idx}/iteration-final'
+params_file = f'{iteration_path}-params.txt'
+
+print('Saving parameters to file', params_file)
+param = params.mean(-1)
+np.savetxt(params_file, param)
+
+print('Run final experiment in folder ', iteration_path)
+MOM6_parameters = ZB_smooth_params.add(
+    SMAG_BI_CONST=param[0],
+    ZB_SCALING=param[1],
+    DAYMAX=7300.0
+)
+hpc = HPC.add(mem=4, ntasks=4, time=4, executable='/home/pp2681/MOM6-examples/build/compiled_executables/MOM6-ZB-2023')
+run_experiment(f'{iteration_path}', hpc, MOM6_parameters)
