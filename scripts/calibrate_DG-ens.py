@@ -8,8 +8,8 @@ from slurm_DG import *
 ## Model configuration
 ZB_smooth_params = PARAMETERS.add(USE_ZB2020='True', STRESS_SMOOTH_PASS=4, DAYMAX=3650.0)
 base_path = '/scratch/pp2681/mom6/Apr2023/R4-sensitivity'
-optimization_idx = 'Vanilla-EKI-ens-size-20-seed'
-N_iterations = 5
+optimization_idx = 'Vanilla-EKI-ens-size-40'
+N_iterations = 3
 
 from julia import Main
 
@@ -19,7 +19,7 @@ Main.eval("""
     prior_2 = constrained_gaussian("ZB-coefficient", 1.5, 0.75, 0.0, 3.0)
     prior = combine_distributions([prior_1, prior_2])
             
-    Random.seed!(2)   # Fix random numbers globally
+    Random.seed!(1)   # Fix random numbers globally
             
     # Noise variance of observation + noise variance of the forward model
     # In the 5-year mean ssh on 1-degree grid. Variance holds most
@@ -30,7 +30,7 @@ Main.eval("""
     y = zeros(440)  # 440 is the size of the ssh vector
             
     ########### Initialize the EnsembleKalmanProcess ##########
-    N_ensemble = 20
+    N_ensemble = 40
     initial_ensemble = construct_initial_ensemble(prior, N_ensemble)
           
     vanilla_eki = EnsembleKalmanProcess(
@@ -44,7 +44,7 @@ Main.eval("""
 os.makedirs(f'{base_path}/{optimization_idx}', exist_ok=True)
 
 metrics = xr.Dataset()
-N_ensemble = 20
+N_ensemble = 40
 ny = 20
 nx = 22
 metrics['ssh_coarse'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble, ny, nx]), dims=['iter','ens', 'yh', 'xh'])
@@ -110,34 +110,13 @@ for iteration in range(N_iterations):
                 SMAG_BI_CONST=param[0],
                 ZB_SCALING=param[1]
             )
-            hpc = HPC.add(name='seed', mem=2, ntasks=4, time=2, executable='/home/pp2681/MOM6-examples/build/compiled_executables/MOM6-ZB-2023')
+            hpc = HPC.add(name='ens', mem=2, ntasks=4, time=2, executable='/home/pp2681/MOM6-examples/build/compiled_executables/MOM6-ZB-2023')
             run_experiment(f'{iteration_path}/ens-member-{ens_member:02d}', hpc, MOM6_parameters)
 
         print('Experiments are scheduled')
         print('Putting in a queue resubmission script')
-        os.system(f'cd /home/pp2681/calibration/scripts; sbatch --mem=16GB --dependency=singleton --export=NONE --job-name=seed -o {base_path}/{optimization_idx}/slurm-%j.out --wrap="python-jl calibrate_DG.py"')
+        os.system(f'cd /home/pp2681/calibration/scripts; sbatch --mem=16GB --dependency=singleton --export=NONE --job-name=ens -o {base_path}/{optimization_idx}/slurm-%j.out --wrap="python-jl calibrate_DG-ens.py"')
         print('Exiting the script')
         sys.exit(0)   # terminate immediately without error code
 
 metrics.astype('float32').to_netcdf(f'{base_path}/{optimization_idx}/metrics.nc')
-
-# params = Main.eval("get_ϕ_final(prior, vanilla_eki)")
-# print('Final params mean/std', params.mean(-1), '/', params.std(-1))
-
-# if not(os.path.exists(iteration_path)):
-#     print('Iterations are completed. Retrieve mean parameter vector and run long experiment.')
-#     iteration_path = f'{base_path}/{optimization_idx}/iteration-final'
-#     params_file = f'{iteration_path}-params.txt'
-
-#     print('Saving parameters to file', params_file)
-#     param = params.mean(-1)
-#     np.savetxt(params_file, param)
-
-#     print('Run final experiment in folder ', iteration_path)
-#     MOM6_parameters = ZB_smooth_params.add(
-#         SMAG_BI_CONST=param[0],
-#         ZB_SCALING=param[1],
-#         DAYMAX=7300.0
-#     )
-#     hpc = HPC.add(mem=4, ntasks=4, time=4, executable='/home/pp2681/MOM6-examples/build/compiled_executables/MOM6-ZB-2023')
-#     run_experiment(f'{iteration_path}', hpc, MOM6_parameters)
