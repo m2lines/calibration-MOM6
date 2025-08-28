@@ -43,6 +43,14 @@ Main.eval("""
 
 os.makedirs(f'{base_path}/{optimization_idx}', exist_ok=True)
 
+metrics = xr.Dataset()
+N_ensemble = 20
+ny = 20
+nx = 22
+metrics['ssh_coarse'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble, ny, nx]), dims=['iter','ens', 'yh', 'xh'])
+metrics['Cs'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble]), dims=['iter', 'ens'])
+metrics['ZB'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble]), dims=['iter', 'ens'])
+
 for iteration in range(N_iterations):
     print(f'################ iteration {iteration} ####################')
     # Return the parameters in constrained space
@@ -69,6 +77,8 @@ for iteration in range(N_iterations):
         ssh = lambda x: x.e.isel(zi=0).sel(Time=slice(1825,3650)).mean('Time')
         ssh_fine = ssh(xr.open_mfdataset('/scratch/pp2681/mom6/Feb2022/bare/R64/output/ave_*.nc', decode_times=False)).coarsen({'xh': 64, 'yh': 64}).mean().compute()
 
+        metrics['ssh_fine'] = ssh_fine.copy()
+
         # 440 is the size of ssh vector
         g_ens = np.zeros([440, params.shape[1]])
         for ens_member, param in enumerate(params.T):
@@ -81,6 +91,10 @@ for iteration in range(N_iterations):
                     sys.exit(1)   # terminate immediately with error code
                 g_ens[:,ens_member] = error
                 print(f'Ensemble member {ens_member} succesfully ingested')
+
+                metrics['ssh_coarse'][iteration][ens_member] = ssh_coarse.copy()
+                metrics['Cs'][iteration][ens_member] = param[0]
+                metrics['ZB'][iteration][ens_member] = param[1]
             except:
                 # Experiment is not ready or exploded or runtime error
                 g_ens[:,ens_member] = np.nan
@@ -105,23 +119,25 @@ for iteration in range(N_iterations):
         print('Exiting the script')
         sys.exit(0)   # terminate immediately without error code
 
-print('Iterations are completed. Retrieve mean parameter vector and run long experiment.')
-params = Main.eval("get_ϕ_final(prior, vanilla_eki)")
+metrics.astype('float32').to_netcdf(f'{base_path}/{optimization_idx}/metrics.nc')
 
+params = Main.eval("get_ϕ_final(prior, vanilla_eki)")
 print('Final params mean/std', params.mean(-1), '/', params.std(-1))
 
-iteration_path = f'{base_path}/{optimization_idx}/iteration-final'
-params_file = f'{iteration_path}-params.txt'
+if not(os.path.exists(iteration_path)):
+    print('Iterations are completed. Retrieve mean parameter vector and run long experiment.')
+    iteration_path = f'{base_path}/{optimization_idx}/iteration-final'
+    params_file = f'{iteration_path}-params.txt'
 
-print('Saving parameters to file', params_file)
-param = params.mean(-1)
-np.savetxt(params_file, param)
+    print('Saving parameters to file', params_file)
+    param = params.mean(-1)
+    np.savetxt(params_file, param)
 
-print('Run final experiment in folder ', iteration_path)
-MOM6_parameters = ZB_smooth_params.add(
-    SMAG_BI_CONST=param[0],
-    ZB_SCALING=param[1],
-    DAYMAX=7300.0
-)
-hpc = HPC.add(mem=4, ntasks=4, time=4, executable='/home/pp2681/MOM6-examples/build/compiled_executables/MOM6-ZB-2023')
-run_experiment(f'{iteration_path}', hpc, MOM6_parameters)
+    print('Run final experiment in folder ', iteration_path)
+    MOM6_parameters = ZB_smooth_params.add(
+        SMAG_BI_CONST=param[0],
+        ZB_SCALING=param[1],
+        DAYMAX=7300.0
+    )
+    hpc = HPC.add(mem=4, ntasks=4, time=4, executable='/home/pp2681/MOM6-examples/build/compiled_executables/MOM6-ZB-2023')
+    run_experiment(f'{iteration_path}', hpc, MOM6_parameters)
