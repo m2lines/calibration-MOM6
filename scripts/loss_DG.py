@@ -20,7 +20,7 @@ def variability_metrics(_e, _u, _v, static, Time=slice(1825,3650), coarse_factor
     u = _u.sel(Time=Time)
     v = _v.sel(Time=Time)
 
-    e_std = e.std('Time').coarsen({'xh':coarse_factor, 'yh':coarse_factor}).mean().compute()
+    e_std = e.std('Time').coarsen({'xh':coarse_factor, 'yh':coarse_factor}, boundary='trim').mean().compute()
 
     u_prime = u - u.mean('Time')
     v_prime = v - v.mean('Time')

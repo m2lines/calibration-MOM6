@@ -71,6 +71,14 @@ class dictionary(dict):
         return self.add(**d)
     
 def configuration(exp='R4'):
+    if exp=='R2':
+        return dictionary(
+            NIGLOBAL=44,
+            NJGLOBAL=40,
+            DT=2160.,
+            DT_FORCING=2160.
+        )
+
     if exp=='R4':
         return dictionary(
             NIGLOBAL=88,
