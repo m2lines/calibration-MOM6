@@ -41,7 +41,7 @@ ANN_netcdf_default = xr.open_dataset('/scratch/pp2681/mom6/CM26_ML_models/ocean3
 observation = xr.open_dataset('/home/pp2681/calibration/scripts/R64_R2/variability.nc')
 
 # EKI configuration
-N_iterations = 5
+N_iterations = 10
 N_ensemble = 100
 
 # Initial ensemble for EKI
@@ -57,24 +57,14 @@ np.random.seed(0)
 initial_ensemble = np.concatenate([A1_mean, b1_mean]).reshape(-1,1) + np.concatenate([A1_std * np.random.randn(len(A1_mean), N_ensemble), b1_std * np.random.randn(len(b1_mean), N_ensemble)]).astype('float64')
 
 # Observation vector for EKI
-# 880 values of ssh std
-y1 = (observation.e_std.isel(zi=slice(0,2))).values.ravel()
-# We have only 10 values of EKE spectrum.
-y2 = (observation.EKE_spectrum).values.ravel()
-# However, we wish equal contirubtion of these values 
-# to the loss function. The easiest way to achieve this is by repeating the elements.
-# Here, the total vector becomes 880 elements
-# Note: repeat operator inflates [1,2,3] to [1,1,...,2,2...,3,3...]
-y2 = np.repeat(y2, 88)
-# 1760 values
-y = np.concatenate([y1, y2]).astype('float64')
+# 10 values of EKE spectrum
+y = (observation.EKE_spectrum).values.ravel().astype('float64')
 
 # Observation (+forward model) covariance matrix
-e_std_var = observation.e_std_var.isel(zi=slice(0,2)).mean(['xh','yh']).compute().values
+# Vector 2 numbers
 EKE_spectrum_var = observation.EKE_spectrum_var.mean(['freq_r']).compute().values
-diag_var = np.concatenate([e_std_var[0] * np.ones(440), e_std_var[1] * np.ones(440), EKE_spectrum_var[0] * np.ones(440), EKE_spectrum_var[1] * np.ones(440)])
-# Here we assume that the variance of forward model and observation is the same (as they have the same time averaging interval)
-Gamma = np.diag(2. * diag_var).astype('float64')
+# [var_0, var_1] becomes [var_0, var_0, var_0, var_0, var_0, var_1 var_1 var_1 var_1 var_1]
+Gamma = 2. * np.diag(np.repeat(EKE_spectrum_var, 5).astype('float64'))
 
 from julia import Main
 
@@ -97,12 +87,8 @@ Main.eval("""
 os.makedirs(f'{base_path}/{optimization_folder}', exist_ok=True)
 
 metrics = xr.Dataset()
-ny = 20
-nx = 22
-nzi = 3
 nzl = 2
 nfreq_r = 5
-metrics['e_std'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble, nzi, ny, nx]), dims=['iter', 'ens', 'zi', 'yh', 'xh'])
 metrics['EKE_spectrum'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble, nzl, nfreq_r]), dims=['iter', 'ens', 'zl', 'freq_r'])
 metrics['param'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble, 63]), dims=['iter', 'ens', 'pdim'])
 
@@ -129,20 +115,16 @@ for iteration in range(N_iterations):
 
     if os.path.exists(iteration_path):
         print('Folder with experiments exists')
-        g_ens = np.zeros([1760, N_ensemble]).astype('float64')
+        g_ens = np.zeros([10, N_ensemble]).astype('float64')
         for ens_member, param in enumerate(params.T):
             try:
                 ds = xr.open_mfdataset(f'{iteration_path}/ens-member-{ens_member:02d}/output/prog_*.nc', decode_times=False)
                 static = xr.open_mfdataset(f'{iteration_path}/ens-member-{ens_member:02d}/output/ocean_geometry.nc', decode_times=False).rename({'lonh': 'xh', 'lath': 'yh'})
                 data = variability_metrics(ds.e, ds.u, ds.v, static)
                 
-                y1 = (data.e_std.isel(zi=slice(0,2))).values.ravel()
-                y2 = (data.EKE_spectrum).values.ravel()
-                y2 = np.repeat(y2, 88)
-                g_ens[:,ens_member] = np.concatenate([y1, y2]).astype('float64')
+                g_ens[:,ens_member] = (data.EKE_spectrum).values.ravel().astype('float64')
                 print(f'Ensemble member {ens_member} succesfully ingested')
 
-                metrics['e_std'][iteration][ens_member] = data.e_std
                 metrics['EKE_spectrum'][iteration][ens_member] = data.EKE_spectrum
             except:
                 # Experiment is not ready or exploded or runtime error
