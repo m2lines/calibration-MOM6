@@ -30,6 +30,6 @@ def variability_metrics(_e, _u, _v, static, Time=slice(1825,3650), coarse_factor
     if compute_e_std:
         e = _e.sel(Time=Time)
         e_std = e.std('Time').coarsen({'xh':coarse_factor, 'yh':coarse_factor}, boundary='trim').mean().compute()
-        ds['e_std'] = e_std
+        ds['e_std'] = e_std.isel(zi=slice(0,2))
 
     return ds

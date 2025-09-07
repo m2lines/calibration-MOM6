@@ -1,2 +1,8 @@
 *ESMF_LogFile
 *.ipynb_checkpoints*
+*.pdf
+*.cpython*.pyc
+*.ffmpeg*
+*.mp4
+*.npy
+*.nc

@@ -8,14 +8,14 @@ from loss_DG import *
 import argparse
 
 ############## To get started ################
-#  python calibrate_variability_DG.py --echo #
+#  python-jl calibrate_variability_multiobjective_DG.py --echo
 
 
 ## Global paths
-TAG = 'van'
+TAG = 'MO'
 hpc = HPC.add(name=TAG, time=2, begin='1minute', executable='/scratch/pp2681/MOM6-examples/build/compiled_executables/MOM6-dev-m2lines-Aug18')
 base_path = '/scratch/pp2681/mom6/CM26_Double_Gyre/calibration/variability-R2'
-optimization_folder = 'EKI-Vanilla-100-spread-0.25'
+optimization_folder = 'EKI-Vanilla-MO'
 this_file = os.path.abspath(__file__)  # full path of current script
 script_name = os.path.basename(this_file)  # just the filename
 commandline = f'cd /home/pp2681/calibration/scripts; sbatch --mem=16GB --dependency=singleton --export=NONE --job-name={TAG} -o {base_path}/{optimization_folder}/slurm-%j.out -e {base_path}/{optimization_folder}/slurm-%j.err --wrap="python-jl {script_name}"'
@@ -38,10 +38,10 @@ ANN_params = PARAMETERS.add(**configuration('R2')).add(DAYMAX=3650.0).add(USE_ZB
 # Read necessary NETCDF files
 ANN_netcdf_default = xr.open_dataset('/scratch/pp2681/mom6/CM26_ML_models/ocean3d/subfilter/FGR3/EXP1/model/Tall.nc').drop_vars(['x_test', 'y_test'])
 # Read observation vector
-observation = xr.open_dataset('/home/pp2681/calibration/scripts/R64_R2/variability.nc')
+observation = xr.open_dataset('/home/pp2681/calibration/scripts/R64_R2/variability-2-degrees.nc')
 
 # EKI configuration
-N_iterations = 10
+N_iterations = 5
 N_ensemble = 100
 
 # Initial ensemble for EKI
@@ -58,13 +58,21 @@ initial_ensemble = np.concatenate([A1_mean, b1_mean]).reshape(-1,1) + np.concate
 
 # Observation vector for EKI
 # 10 values of EKE spectrum
-y = (observation.EKE_spectrum).values.ravel().astype('float64')
+y1 = (observation.EKE_spectrum).values.ravel().astype('float64')
+# 220 values of ssh std
+y2 = (observation.e_std).values.ravel().astype('float64')
+y = np.concatenate([y1,y2])
 
 # Observation (+forward model) covariance matrix
-# Vector 2 numbers
-EKE_spectrum_var = observation.EKE_spectrum_var.mean(['freq_r']).compute().values
-# [var_0, var_1] becomes [var_0, var_0, var_0, var_0, var_0, var_1 var_1 var_1 var_1 var_1]
-Gamma = 2. * np.diag(np.repeat(EKE_spectrum_var, 5).astype('float64'))
+# This factor multiplies the noise variance matrix by two, that way assuming that observation error
+# and forward model error are independent and identically distributed
+OBS_AND_FORWARD_FACTOR = 2.
+# We multiply the noise variance of spatial field by this factor to
+# reduce its contribution to the loss related to different number of elements (i.e., MSE instead of SSE)
+WEIGHTING_FACTOR = len(y2) / len(y1)
+var1 = (observation.EKE_spectrum_var_ave).values.ravel().astype('float64')
+var2 = WEIGHTING_FACTOR * (observation.e_std_var_ave).values.ravel().astype('float64')
+Gamma = OBS_AND_FORWARD_FACTOR * np.diag(np.concatenate([var1, var2]))
 
 from julia import Main
 
@@ -91,8 +99,17 @@ os.makedirs(f'{base_path}/{optimization_folder}', exist_ok=True)
 metrics = xr.Dataset()
 nzl = 2
 nfreq_r = 5
+ny = 10
+nx = 11
+metrics['e_std'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble, nzl, ny, nx]), dims=['iter', 'ens', 'zi', 'yh', 'xh'])
 metrics['EKE_spectrum'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble, nzl, nfreq_r]), dims=['iter', 'ens', 'zl', 'freq_r'])
 metrics['param'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble, 63]), dims=['iter', 'ens', 'pdim'])
+
+# Copy true metrics
+metrics['e_std_true'] = observation.e_std
+metrics['EKE_spectrum_true'] = observation.EKE_spectrum
+metrics['e_std_var_ave'] = observation.e_std_var_ave
+metrics['EKE_spectrum_var_ave'] = observation.EKE_spectrum_var_ave
 
 for iteration in range(N_iterations):
     print(f'################ iteration {iteration} ####################')
@@ -117,14 +134,16 @@ for iteration in range(N_iterations):
 
     if os.path.exists(iteration_path):
         print('Folder with experiments exists')
-        g_ens = np.zeros([10, N_ensemble]).astype('float64')
+        g_ens = np.zeros([230, N_ensemble]).astype('float64')
         for ens_member, param in enumerate(params.T):
             try:
                 ds = xr.open_mfdataset(f'{iteration_path}/ens-member-{ens_member:02d}/output/prog_*.nc', decode_times=False)
                 static = xr.open_mfdataset(f'{iteration_path}/ens-member-{ens_member:02d}/output/ocean_geometry.nc', decode_times=False).rename({'lonh': 'xh', 'lath': 'yh'})
-                data = variability_metrics(ds.e, ds.u, ds.v, static)
+                data = variability_metrics(ds.e, ds.u, ds.v, static, coarse_factor=4, compute_e_std=True)
                 
-                g_ens[:,ens_member] = (data.EKE_spectrum).values.ravel().astype('float64')
+                y1 = (data.EKE_spectrum).values.ravel().astype('float64')
+                y2 = (data.e_std).values.ravel().astype('float64')
+                g_ens[:,ens_member] = np.concatenate([y1,y2])
                 print(f'Ensemble member {ens_member} succesfully ingested')
 
                 metrics['EKE_spectrum'][iteration][ens_member] = data.EKE_spectrum
