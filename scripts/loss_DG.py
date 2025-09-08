@@ -4,7 +4,7 @@ import sys
 sys.path.append('../src-double-gyre')
 from helpers.computational_tools import compute_isotropic_KE
 
-def variability_metrics(_e, _u, _v, static, Time=slice(1825,3650), coarse_factor=2, compute_e_std=False):
+def variability_metrics(_e, _u, _v, static, Time=slice(1825,3650), coarse_factor=4, compute_e=False):
     '''
     This function computes metrics of interest which we would like to optimize:
     * STD of interfaces
@@ -27,9 +27,11 @@ def variability_metrics(_e, _u, _v, static, Time=slice(1825,3650), coarse_factor
     ds = xr.Dataset()
     ds['EKE_spectrum'] = EKE_spectrum
 
-    if compute_e_std:
+    if compute_e:
         e = _e.sel(Time=Time)
         e_std = e.std('Time').coarsen({'xh':coarse_factor, 'yh':coarse_factor}, boundary='trim').mean().compute()
+        e_mean = e.mean('Time').coarsen({'xh':coarse_factor, 'yh':coarse_factor}, boundary='trim').mean().compute()
         ds['e_std'] = e_std.isel(zi=slice(0,2))
+        ds['e_mean'] = e_mean.isel(zi=slice(0,2))
 
     return ds
