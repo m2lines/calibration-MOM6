@@ -401,9 +401,9 @@ class Experiment:
     def KE(self):
         return 0.5 * (remesh(self.u**2, self.e) + remesh(self.v**2, self.e))
     
-    @property
-    def logKEz(self):
-        return np.log10(0.5 * (self.h * (remesh(self.u**2, self.e) + remesh(self.v**2, self.e))).sum('zl'))
+    @netcdf_property
+    def KEz(self):
+        return 0.5 * (self.h * (remesh(self.u**2, self.e) + remesh(self.v**2, self.e))).sum('zl')
     
     @netcdf_property
     def EKE(self):

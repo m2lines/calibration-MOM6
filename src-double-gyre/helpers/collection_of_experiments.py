@@ -458,8 +458,40 @@ class CollectionOfExperiments:
             plt.gca().set_aspect(1)
         
         cbar = plt.colorbar(im, ax=plt.gcf().axes, extend='both')
-        cbar.set_label(label='Surface velocity, m/s' ,weight='bold', fontsize=20)
+        cbar.set_label(label='Surface velocity, m/s' , fontsize=14)
         cbar.set_ticks(ticks=[2e-2, 0.05, 0.1, 0.2, 0.5], labels=[2e-2, 0.05, 0.1, 0.2, 0.5])
+
+    def plot_logKEz(self, exps, labels=None, idx=-1, ncols=3):
+        if labels is None:
+            labels=exps
+        nfig = len(exps)
+        ncol = min(ncols,nfig)
+        nrows = nfig / ncols
+        if nrows > 1:
+            nrows = int(np.ceil(nrows))
+        else:
+            nrows = 1
+        plt.figure(figsize=(5*ncol,4*nrows))
+        plt.subplots_adjust(hspace=0.3, wspace=0.3)
+        for ifig, exp in enumerate(exps):
+            plt.subplot(nrows,ncol,ifig+1)
+            field = self[exp].KEz.isel(Time=idx)
+            cmap = plt.get_cmap('inferno')
+            norm = matplotlib.colors.LogNorm(vmin=1e-1, vmax=1e+2)
+            im = field.plot.imshow(cmap=cmap, norm=norm, 
+                add_colorbar=False, interpolation='none')
+            plt.xticks([0,5,10,15,20])
+            plt.yticks([30,35,40,45,50])
+            plt.xlim([0,22])
+            plt.ylim([30,50])
+            plt.xlabel('Longitude')
+            plt.ylabel('Latitude')
+            plt.title(labels[ifig])
+            plt.gca().set_aspect(1)
+        
+        cbar = plt.colorbar(im, ax=plt.gcf().axes, extend='both')
+        cbar.set_label(label='Depth-integrated KE, m$^3$s$^{-2}$', fontsize=12)
+        cbar.set_ticks(ticks=[1e-1, 1e0, 1e1, 1e2])
 
     def plot_velocity(self, exps, labels=None, key='u_mean'):
         if labels is None:
