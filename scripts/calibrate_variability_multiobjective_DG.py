@@ -15,12 +15,12 @@ import argparse
 TAG = 'MO'
 hpc = HPC.add(name=TAG, time=2, begin='1minute', executable='/scratch/pp2681/MOM6-examples/build/compiled_executables/MOM6-dev-m2lines-Aug18')
 base_path = '/scratch/pp2681/mom6/CM26_Double_Gyre/calibration/variability-R2'
-optimization_folder = 'EKI-Vanilla-MO'
+optimization_folder = 'EKI-Vanilla-e-mean-std-spread-0.1'
 this_file = os.path.abspath(__file__)  # full path of current script
 script_name = os.path.basename(this_file)  # just the filename
 commandline = f'cd /home/pp2681/calibration/scripts; sbatch --mem=16GB --dependency=singleton --export=NONE --job-name={TAG} -o {base_path}/{optimization_folder}/slurm-%j.out -e {base_path}/{optimization_folder}/slurm-%j.err --wrap="python-jl {script_name}"'
 # Here, we attenuate the spread of the initial ensemble as if not doing so, experiments explode
-ENS_SPREAD = 0.25
+ENS_SPREAD = 0.1
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -38,10 +38,10 @@ ANN_params = PARAMETERS.add(**configuration('R2')).add(DAYMAX=3650.0).add(USE_ZB
 # Read necessary NETCDF files
 ANN_netcdf_default = xr.open_dataset('/scratch/pp2681/mom6/CM26_ML_models/ocean3d/subfilter/FGR3/EXP1/model/Tall.nc').drop_vars(['x_test', 'y_test'])
 # Read observation vector
-observation = xr.open_dataset('/home/pp2681/calibration/scripts/R64_R2/variability-2-degrees.nc')
+observation = xr.open_dataset('/home/pp2681/calibration/scripts/R64_R2/full.nc')
 
 # EKI configuration
-N_iterations = 5
+N_iterations = 10
 N_ensemble = 100
 
 # Initial ensemble for EKI
@@ -57,8 +57,8 @@ np.random.seed(0)
 initial_ensemble = np.concatenate([A1_mean, b1_mean]).reshape(-1,1) + np.concatenate([A1_std * np.random.randn(len(A1_mean), N_ensemble), b1_std * np.random.randn(len(b1_mean), N_ensemble)]).astype('float64')
 
 # Observation vector for EKI
-# 10 values of EKE spectrum
-y1 = (observation.EKE_spectrum).values.ravel().astype('float64')
+# 220 values of ssh mean
+y1 = (observation.e_mean).values.ravel().astype('float64')
 # 220 values of ssh std
 y2 = (observation.e_std).values.ravel().astype('float64')
 y = np.concatenate([y1,y2])
@@ -69,9 +69,8 @@ y = np.concatenate([y1,y2])
 OBS_AND_FORWARD_FACTOR = 2.
 # We multiply the noise variance of spatial field by this factor to
 # reduce its contribution to the loss related to different number of elements (i.e., MSE instead of SSE)
-WEIGHTING_FACTOR = len(y2) / len(y1)
-var1 = (observation.EKE_spectrum_var_ave).values.ravel().astype('float64')
-var2 = WEIGHTING_FACTOR * (observation.e_std_var_ave).values.ravel().astype('float64')
+var1 = (observation.e_mean_var_ave).values.ravel().astype('float64')
+var2 = (observation.e_std_var_ave).values.ravel().astype('float64')
 Gamma = OBS_AND_FORWARD_FACTOR * np.diag(np.concatenate([var1, var2]))
 
 from julia import Main
@@ -102,13 +101,16 @@ nfreq_r = 5
 ny = 10
 nx = 11
 metrics['e_std'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble, nzl, ny, nx]), dims=['iter', 'ens', 'zi', 'yh', 'xh'])
+metrics['e_mean'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble, nzl, ny, nx]), dims=['iter', 'ens', 'zi', 'yh', 'xh'])
 metrics['EKE_spectrum'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble, nzl, nfreq_r]), dims=['iter', 'ens', 'zl', 'freq_r'])
 metrics['param'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble, 63]), dims=['iter', 'ens', 'pdim'])
 
 # Copy true metrics
 metrics['e_std_true'] = observation.e_std
+metrics['e_mean_true'] = observation.e_mean
 metrics['EKE_spectrum_true'] = observation.EKE_spectrum
 metrics['e_std_var_ave'] = observation.e_std_var_ave
+metrics['e_mean_var_ave'] = observation.e_mean_var_ave
 metrics['EKE_spectrum_var_ave'] = observation.EKE_spectrum_var_ave
 
 for iteration in range(N_iterations):
@@ -118,8 +120,6 @@ for iteration in range(N_iterations):
 
     iteration_path = f'{base_path}/{optimization_folder}/iteration-{iteration:02d}'
     params_file = f'{iteration_path}-params.txt'
-
-    print('Params mean-ref/std', params.mean(-1) - np.concatenate([A1_mean, b1_mean]), '/', params.std(-1))
 
     if not(os.path.exists(params_file)):
         print('Saving parameters to file', params_file)
@@ -134,19 +134,21 @@ for iteration in range(N_iterations):
 
     if os.path.exists(iteration_path):
         print('Folder with experiments exists')
-        g_ens = np.zeros([230, N_ensemble]).astype('float64')
+        g_ens = np.zeros([440, N_ensemble]).astype('float64')
         for ens_member, param in enumerate(params.T):
             try:
                 ds = xr.open_mfdataset(f'{iteration_path}/ens-member-{ens_member:02d}/output/prog_*.nc', decode_times=False)
                 static = xr.open_mfdataset(f'{iteration_path}/ens-member-{ens_member:02d}/output/ocean_geometry.nc', decode_times=False).rename({'lonh': 'xh', 'lath': 'yh'})
-                data = variability_metrics(ds.e, ds.u, ds.v, static, coarse_factor=4, compute_e_std=True)
+                data = variability_metrics(ds.e, ds.u, ds.v, static, coarse_factor=4, compute_e=True)
                 
-                y1 = (data.EKE_spectrum).values.ravel().astype('float64')
+                y1 = (data.e_mean).values.ravel().astype('float64')
                 y2 = (data.e_std).values.ravel().astype('float64')
                 g_ens[:,ens_member] = np.concatenate([y1,y2])
                 print(f'Ensemble member {ens_member} succesfully ingested')
 
                 metrics['EKE_spectrum'][iteration][ens_member] = data.EKE_spectrum
+                metrics['e_mean'][iteration][ens_member] = data.e_mean
+                metrics['e_std'][iteration][ens_member] = data.e_std
             except:
                 # Experiment is not ready or exploded or runtime error
                 g_ens[:,ens_member] = np.nan
@@ -157,6 +159,8 @@ for iteration in range(N_iterations):
         Main.g_ens = g_ens
         Main.eval("update_ensemble!(eki, g_ens, deterministic_forward_map=false)")
         print('Forward model evaluations are passed to the EKI. Going to the next iterations...')
+        os.system(f'rm -f {base_path}/{optimization_folder}/metrics.nc')
+        metrics.astype('float32').to_netcdf(f'{base_path}/{optimization_folder}/metrics.nc')
     else:
         print('Run experiments in folder ', iteration_path)
         for ens_member, param in enumerate(params.T):
@@ -176,5 +180,3 @@ for iteration in range(N_iterations):
         os.system(commandline)
         print('Exiting the script')
         sys.exit(0)   # terminate immediately without error code
-
-metrics.astype('float32').to_netcdf(f'{base_path}/{optimization_folder}/metrics.nc')
