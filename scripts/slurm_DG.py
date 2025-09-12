@@ -50,7 +50,7 @@ def run_experiment(folder, hpc, parameters):
     create_slurm(hpc, os.path.join(folder,'mom.sub'))
     create_MOM_override(parameters, os.path.join(folder,'MOM_override'))
     
-    os.system('cp -r ~/MOM6-examples/src/MOM6/experiments/configurations/double_gyre/* '+folder)
+    os.system('cp -r /home/pp2681/MOM6-examples/build/configurations/double_gyre/* '+folder)
 
     with open(os.path.join(folder,'args.json'), 'w') as f:
         json.dump(parameters, f, indent=2)

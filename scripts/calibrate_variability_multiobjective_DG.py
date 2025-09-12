@@ -12,9 +12,9 @@ import argparse
 
 
 ## Global paths
-TAG = 'MO'
-hpc = HPC.add(name=TAG, time=2, begin='1minute', executable='/scratch/pp2681/MOM6-examples/build/compiled_executables/MOM6-dev-m2lines-Aug18')
-base_path = '/scratch/pp2681/mom6/CM26_Double_Gyre/calibration/variability-R2'
+TAG = 'eki4'
+hpc = HPC.add(name=TAG, time=6, begin='1minute', executable='/scratch/pp2681/MOM6-examples/build/compiled_executables/MOM6-dev-m2lines-Aug18')
+base_path = '/scratch/pp2681/mom6/CM26_Double_Gyre/calibration/variability-R4'
 optimization_folder = 'EKI-Vanilla-e-mean-std-spread-0.1'
 this_file = os.path.abspath(__file__)  # full path of current script
 script_name = os.path.basename(this_file)  # just the filename
@@ -34,14 +34,14 @@ if args.echo:
     sys.exit(0)
 
 # Model configuration
-ANN_params = PARAMETERS.add(**configuration('R2')).add(DAYMAX=3650.0).add(USE_ZB2020='True',ZB2020_USE_ANN='True',ZB2020_ANN_FILE_TALL='INPUT/Tall.nc',USE_CIRCULATION_IN_HORVISC='True')
+ANN_params = PARAMETERS.add(**configuration('R4')).add(DAYMAX=3650.0).add(USE_ZB2020='True',ZB2020_USE_ANN='True',ZB2020_ANN_FILE_TALL='INPUT/Tall.nc',USE_CIRCULATION_IN_HORVISC='True')
 # Read necessary NETCDF files
 ANN_netcdf_default = xr.open_dataset('/scratch/pp2681/mom6/CM26_ML_models/ocean3d/subfilter/FGR3/EXP1/model/Tall.nc').drop_vars(['x_test', 'y_test'])
 # Read observation vector
-observation = xr.open_dataset('/home/pp2681/calibration/scripts/R64_R2/full.nc')
+observation = xr.open_dataset('/home/pp2681/calibration/scripts/R64_R4/full.nc')
 
 # EKI configuration
-N_iterations = 10
+N_iterations = 4
 N_ensemble = 100
 
 # Initial ensemble for EKI
@@ -97,7 +97,7 @@ os.makedirs(f'{base_path}/{optimization_folder}', exist_ok=True)
 
 metrics = xr.Dataset()
 nzl = 2
-nfreq_r = 5
+nfreq_r = 12
 ny = 10
 nx = 11
 metrics['e_std'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble, nzl, ny, nx]), dims=['iter', 'ens', 'zi', 'yh', 'xh'])
@@ -139,7 +139,7 @@ for iteration in range(N_iterations):
             try:
                 ds = xr.open_mfdataset(f'{iteration_path}/ens-member-{ens_member:02d}/output/prog_*.nc', decode_times=False)
                 static = xr.open_mfdataset(f'{iteration_path}/ens-member-{ens_member:02d}/output/ocean_geometry.nc', decode_times=False).rename({'lonh': 'xh', 'lath': 'yh'})
-                data = variability_metrics(ds.e, ds.u, ds.v, static, coarse_factor=4, compute_e=True)
+                data = variability_metrics(ds.e, ds.u, ds.v, static, coarse_factor=8, compute_e=True)
                 
                 y1 = (data.e_mean).values.ravel().astype('float64')
                 y2 = (data.e_std).values.ravel().astype('float64')
