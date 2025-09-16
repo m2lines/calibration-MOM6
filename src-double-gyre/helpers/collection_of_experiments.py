@@ -331,7 +331,7 @@ class CollectionOfExperiments:
 
         plt.tight_layout()
 
-    def plot_ssh_std(self, exps, labels=None, target='R64_R2', ncols=3):
+    def plot_ssh_std(self, exps, labels=None, target=None, ncols=3):
         if labels is None:
             labels=exps
         nfig = len(exps)
