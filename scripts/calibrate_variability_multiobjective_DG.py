@@ -10,12 +10,11 @@ import argparse
 ############## To get started ################
 #  python-jl calibrate_variability_multiobjective_DG.py --echo
 
-
 ## Global paths
 TAG = 'eki4'
 hpc = HPC.add(name=TAG, time=6, begin='1minute', executable='/scratch/pp2681/MOM6-examples/build/compiled_executables/MOM6-dev-m2lines-Aug18')
 base_path = '/scratch/pp2681/mom6/CM26_Double_Gyre/calibration/variability-R4'
-optimization_folder = 'EKI-Vanilla-e-mean-std-spread-0.1'
+optimization_folder = 'EKI-Vanilla-Gamma-e-mean-std-spread-0.1'
 this_file = os.path.abspath(__file__)  # full path of current script
 script_name = os.path.basename(this_file)  # just the filename
 commandline = f'cd /home/pp2681/calibration/scripts; sbatch --mem=16GB --dependency=singleton --export=NONE --job-name={TAG} -o {base_path}/{optimization_folder}/slurm-%j.out -e {base_path}/{optimization_folder}/slurm-%j.err --wrap="python-jl {script_name}"'
@@ -72,6 +71,25 @@ OBS_AND_FORWARD_FACTOR = 2.
 var1 = (observation.e_mean_var_ave).values.ravel().astype('float64')
 var2 = (observation.e_std_var_ave).values.ravel().astype('float64')
 Gamma = OBS_AND_FORWARD_FACTOR * np.diag(np.concatenate([var1, var2]))
+
+print('diagonal Gamma shape', Gamma.shape)
+
+############ Add covariance matrix of noise #################
+# we assumed that collapsed ensemble from vanilla EKI can serve as 
+# a proxy for covariance matrix estimate for the noise in the forward model
+metrics_R4 = xr.open_dataset('/scratch/pp2681/mom6/CM26_Double_Gyre/calibration/variability-R4/EKI-Vanilla-e-mean-std-spread-0.1/metrics.nc')
+g_ens =  np.vstack([np.array(metrics_R4['e_mean'].isel(iter=-1)).reshape([100, -1]).astype('float64').T,
+                    np.array(metrics_R4['e_std'].isel(iter=-1)).reshape([100, -1]).astype('float64').T])
+mean=lambda x: x.mean(axis=-1,keepdims=True)
+cov_yy_R4 = (g_ens-mean(g_ens))   @ (g_ens-mean(g_ens)).T / 100
+# Here we add only one copy of covariance matrix because we do not have
+# a similar matrix for noise of high-resolution model
+Gamma += cov_yy_R4
+
+# Enforce symmetry
+Gamma = 0.5 * (Gamma + Gamma.T)
+
+print('Full Gamma shape', Gamma.shape)
 
 from julia import Main
 
