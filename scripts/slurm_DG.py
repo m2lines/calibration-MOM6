@@ -3,7 +3,7 @@ import json
 import numpy as np
 
 # creates slurm script mom.sub
-def create_slurm(p, filename):
+def create_slurm(p, filename, call_function):
     # p - dictionary with parameters
     if p['mem'] < 1:
         mem = str(int(p['mem']*1000))+'MB'
@@ -20,6 +20,8 @@ def create_slurm(p, filename):
     '#SBATCH --begin=now+'+str(p['begin']),
     '#SBATCH --job-name='+str(p['name']),
     '#SBATCH --export=NONE',
+
+    call_function,
     
     'module purge',
     'source ~/MOM6-examples/build/intel/env',
@@ -41,13 +43,13 @@ def create_MOM_override(p, filename):
     with open(filename,'w') as fid:
         fid.writelines([ line+'\n' for line in lines])
 
-def run_experiment(folder, hpc, parameters):
+def run_experiment(folder, hpc, parameters, call_function=''):
     if os.path.exists(folder):
         print('Folder '+folder+' already exists. We skip it')
         return
     os.system('mkdir -p '+folder)
     
-    create_slurm(hpc, os.path.join(folder,'mom.sub'))
+    create_slurm(hpc, os.path.join(folder,'mom.sub'), call_function)
     create_MOM_override(parameters, os.path.join(folder,'MOM_override'))
     
     os.system('cp -r /home/pp2681/MOM6-examples/build/configurations/double_gyre/* '+folder)
