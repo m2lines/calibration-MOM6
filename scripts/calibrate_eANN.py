@@ -11,15 +11,16 @@ import argparse
 #  python-jl calibrate_eANN.py --echo
 
 ## Global paths
-TAG = 'eANN'
+TAG = 'DM-N'
 hpc = HPC.add(name=TAG, time=2, begin='1minute', executable='/scratch/pp2681/MOM6-examples/build/compiled_executables/MOM6-dev-m2lines-Aug18')
 base_path = '/scratch/pp2681/mom6/CM26_Double_Gyre/calibration/variability-R2-eANN'
-optimization_folder = 'EKI-Vanilla-N8-forcing-spread-0-1'
+optimization_folder = 'misfit-nesterov'
+ANN_default_path = '/scratch/pp2681/mom6/CM26_ML_models/ocean3d/subfilter/FGR3/equivariant/learning_rate/N8-forcing-fluxes/0.05/model/'
 this_file = os.path.abspath(__file__)  # full path of current script
 script_name = os.path.basename(this_file)  # just the filename
 commandline = f'cd /home/pp2681/calibration/scripts; sbatch --mem=16GB --dependency=singleton --export=NONE --job-name={TAG} -o {base_path}/{optimization_folder}/slurm-%j.out -e {base_path}/{optimization_folder}/slurm-%j.err --wrap="python-jl {script_name}"'
 # Here, we attenuate the spread of the initial ensemble as if not doing so, experiments explode
-ENS_SPREAD = 0.1
+ENS_SPREAD = 0.25
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -35,23 +36,35 @@ if args.echo:
 # Model configuration
 exp_params = PARAMETERS.add(**configuration('R2')).add(DAYMAX=3650.0).add(USE_ZB2020='True',ZB2020_USE_ANN='True',ZB2020_ANN_FILE_TALL='INPUT/Tall.nc',USE_CIRCULATION_IN_HORVISC='True')
 # Read necessary NETCDF files
-ANN_netcdf_default = xr.open_dataset('/scratch/pp2681/mom6/CM26_ML_models/ocean3d/subfilter/FGR3/equivariant/16-N8-forcing/model/weights_and_perturbations.nc').load()
+ANN_netcdf_default = xr.open_dataset(f'{ANN_default_path}/eANN.nc').load()
 # Read observation vector
 observation = xr.open_dataset('/home/pp2681/calibration/scripts/R64_R2/full.nc')
 
 # EKI configuration
-N_iterations = 5
+N_iterations = 10
 N_ensemble = 100
 
 np.random.seed(0)
 # Initial ensemble for EKI
-# 23 x 100 matrix
-weights1 = ANN_netcdf_default['weights1'] + ENS_SPREAD * xr.DataArray(ANN_netcdf_default['weights1_std'].mean().values * np.random.randn(len(ANN_netcdf_default['weights1']), N_ensemble), dims=['pdim1', 'ens'])
-weights2 = ANN_netcdf_default['weights2'] + ENS_SPREAD * xr.DataArray(ANN_netcdf_default['weights2_std'].mean().values * np.random.randn(len(ANN_netcdf_default['weights2']), N_ensemble), dims=['pdim2', 'ens'])
-biases1 = ANN_netcdf_default['biases1'] + ENS_SPREAD * xr.DataArray(ANN_netcdf_default['biases1_std'].mean().values * np.random.randn(len(ANN_netcdf_default['biases1']), N_ensemble), dims=['pdim3', 'ens'])
-biases2 = ANN_netcdf_default['biases2'] + ENS_SPREAD * xr.DataArray(ANN_netcdf_default['biases2_std'].mean().values * np.random.randn(len(ANN_netcdf_default['biases2']), N_ensemble), dims=['pdim4', 'ens'])
+# 13 x 100 matrix; (For 64 neurons and N8 symmetries)
+def generate_ensemble_for_parameter_vector(parameter_key):
+    parameter_vector = ANN_netcdf_default[parameter_key].values
+    n_param = len(parameter_vector)
+    if n_param > 5:
+        parameter_scale = float(parameter_vector.std())
+    else:
+        parameter_scale = float(np.abs(parameter_vector).mean())
 
-initial_ensemble = np.concatenate([weights1.values, weights2.values, biases1.values, biases2.values])
+    random_perturbation = ENS_SPREAD * parameter_scale * np.random.randn(n_param, N_ensemble)
+
+    return parameter_vector.reshape(-1,1) + random_perturbation
+
+initial_ensemble = []
+for parameter_key in ['weights2', 'biases2']:
+    initial_ensemble.append(generate_ensemble_for_parameter_vector(parameter_key))
+
+initial_ensemble = np.concatenate(initial_ensemble)
+print('default eANN path', ANN_default_path)
 print('Initial enemble shape: ', initial_ensemble.shape)
 print('SPREAD: ', ENS_SPREAD)
 
@@ -62,12 +75,6 @@ y1 = (observation.e_mean).values.ravel().astype('float64')
 y2 = (observation.e_std).values.ravel().astype('float64')
 y = np.concatenate([y1,y2])
 
-def MSE_weighted(e_mean, e_std):
-    obs_length = len(y)
-    out =  ((e_mean - observation.e_mean)**2 / observation.e_mean_var_ave + \
-            (e_std  - observation.e_std )**2 / observation.e_mean_var_ave).sum(['xh', 'yh', 'zi']) / obs_length
-    return xr.where(out > 0, out, np.nan)
-
 # Observation (+forward model) covariance matrix
 # This factor multiplies the noise variance matrix by two, that way assuming that observation error
 # and forward model error are independent and identically distributed
@@ -77,6 +84,12 @@ OBS_AND_FORWARD_FACTOR = 2.
 var1 = (observation.e_mean_var_ave).values.ravel().astype('float64')
 var2 = (observation.e_std_var_ave).values.ravel().astype('float64')
 Gamma = OBS_AND_FORWARD_FACTOR * np.diag(np.concatenate([var1, var2]))
+
+obs_length = len(y)
+def MSE_weighted(e_mean, e_std):    
+    out =  ((e_mean - observation.e_mean)**2 / (OBS_AND_FORWARD_FACTOR*observation.e_mean_var_ave) + \
+            (e_std  - observation.e_std )**2 / (OBS_AND_FORWARD_FACTOR*observation.e_std_var_ave)).sum(['xh', 'yh', 'zi']) / obs_length
+    return xr.where(out > 0, out, np.nan)
 
 from julia import Main
 
@@ -92,8 +105,8 @@ Main.initial_ensemble = initial_ensemble
 Main.eval("""
     eki = EnsembleKalmanProcess(
     initial_ensemble, y, Γ, Inversion(),
-    scheduler = DefaultScheduler(1),
-    accelerator = DefaultAccelerator(),
+    #scheduler = DefaultScheduler(1),
+    #accelerator = DefaultAccelerator(),
     localization_method = EnsembleKalmanProcesses.Localizers.NoLocalization(),
     verbose=true)
     """)
@@ -104,10 +117,10 @@ metrics = xr.Dataset()
 nzl = 2
 ny = 10
 nx = 11
-nfreq_r = 5
+nfreq_r = len(observation.freq_r)
 metrics['e_std'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble, nzl, ny, nx]), dims=['iter', 'ens', 'zi', 'yh', 'xh'])
 metrics['e_mean'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble, nzl, ny, nx]), dims=['iter', 'ens', 'zi', 'yh', 'xh'])
-metrics['param'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble, 23]), dims=['iter', 'ens', 'pdim'])
+metrics['param'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble, initial_ensemble.shape[0]]), dims=['iter', 'ens', 'pdim'])
 metrics['EKE_spectrum'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble, nzl, nfreq_r]), dims=['iter', 'ens', 'zl', 'freq_r'])
 metrics['WMSE'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble]), dims=['iter', 'ens'])
 metrics['WMSE_MAP'] = xr.DataArray(np.nan * np.zeros([N_iterations]), dims='iter')
@@ -169,16 +182,14 @@ for iteration in range(N_iterations):
         print('Run experiments in folder ', iteration_path)
         for ens_member, param in enumerate(params.T):
             experiment_folder = f'{iteration_path}/ens-member-{ens_member:02d}'
-            weights_netcdf = xr.Dataset()
-            weights_netcdf['weights1'] = xr.DataArray(param[:18], dims='pdim1')
-            weights_netcdf['weights2'] = xr.DataArray(param[18:21], dims='pdim2')
-            weights_netcdf['biases1'] = xr.DataArray(param[21:22], dims='pdim3')
-            weights_netcdf['biases2'] = xr.DataArray(param[22:23], dims='pdim4')
+            weights_netcdf = ANN_netcdf_default.copy()
+            weights_netcdf['weights2'] = xr.DataArray(param[:12], dims='pdim2')
+            weights_netcdf['biases2'] = xr.DataArray(param[12:13], dims='pdim4')
 
             call_function = ('singularity exec --nv --overlay /scratch/$USER/python-container/python-overlay.ext3:ro '
                              '--bind /scratch/pp2681/python-container/escnn-cache:/ext3/miniconda3/lib/python3.11/site-packages/escnn/group/_cache/ '
                              ' /scratch/work/public/singularity/cuda11.6.124-cudnn8.4.0.27-devel-ubuntu20.04.4.sif '
-                             f' /bin/bash -c "source /ext3/env.sh; time python /home/pp2681/calibration/scripts/eANN_to_ANN.py --netcdf_ANN=/scratch/pp2681/mom6/CM26_ML_models/ocean3d/subfilter/FGR3/equivariant/16-N8-forcing/model/Tall.nc --netcdf_eANN={experiment_folder}/INPUT/eANN.nc --netcdf_output={experiment_folder}/INPUT/Tall.nc"')
+                             f' /bin/bash -c "source /ext3/env.sh; time python /home/pp2681/calibration/scripts/eANN_to_ANN.py --netcdf_ANN={ANN_default_path}/Tall.nc --netcdf_eANN={experiment_folder}/INPUT/eANN.nc --netcdf_output={experiment_folder}/INPUT/Tall.nc"')
             run_experiment(experiment_folder, hpc, exp_params, call_function)
             # We save data after initializing experiment to do not interrupt workflow.
             os.makedirs(f'{experiment_folder}/INPUT', exist_ok=True)

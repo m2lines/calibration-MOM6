@@ -219,10 +219,10 @@ class CollectionOfExperiments:
 
         return p
 
-    def plot_transfer(self, exp, target='R64_R4', callback=True):
-        full = self[exp].Smagorinsky_transfer
-        SSM = self[exp].SSM_transfer
-        Rey = self[exp].Rey_transfer
+    def plot_transfer(self, exp, target=None, callback=True):
+        zb20 = self[exp].ZB_transfer
+        #SSM = self[exp].SSM_transfer
+        #Rey = self[exp].Rey_transfer
         kmax = self[exp].kmax
         if target is not None:
             SGS = self[target].SGS_transfer
@@ -235,10 +235,10 @@ class CollectionOfExperiments:
             plt.subplot(1,2,zl+1)
             if target is not None:
                 SGS.isel(zl=zl).plot(label='SGS', color='k', ls='-')
-            SSM.isel(zl=zl).plot(label='SSM', color='tab:orange', ls='--')
-            Rey.isel(zl=zl).plot(label='Reynolds', color='tab:red', ls=':')
-            (full-SSM-Rey).isel(zl=zl).plot(label='Smag', color='tab:green', ls='-.')
-            (full).isel(zl=zl).plot(label='Full', color='tab:blue')
+            zb20.isel(zl=zl).plot(label='Subgrid model', color='tab:orange', ls='--')
+            #Rey.isel(zl=zl).plot(label='Reynolds', color='tab:red', ls=':')
+            #(full-SSM-Rey).isel(zl=zl).plot(label='Smag', color='tab:green', ls='-.')
+            #(full).isel(zl=zl).plot(label='Full', color='tab:blue')
             plt.legend()
             plt.axhline(y=0,ls='-',color='gray',alpha=0.5)
             ax2 = plt.gca().secondary_xaxis('top', functions=(lambda x: x/kmax, lambda x: x*kmax))
@@ -259,10 +259,10 @@ class CollectionOfExperiments:
         if callback:
             self.plot_power(exp,target)
 
-    def plot_power(self, exp, target='R64_R4'):
-        smag = self[exp].Smagorinsky_power
-        ZB = self[exp].ZB_power
-        model = self[exp].Model_power
+    def plot_power(self, exp, target=None):
+        zb20 = self[exp].ZB_power
+        #ZB = self[exp].ZB_power
+        #model = self[exp].Model_power
         kmax = self[exp].kmax
         if target is not None:
             SGS = self[target].SGS_power
@@ -275,9 +275,9 @@ class CollectionOfExperiments:
             plt.subplot(1,2,zl+1)
             if target is not None:
                 SGS.isel(zl=zl).plot(label='SGS', color='k', ls='-')
-            ZB.isel(zl=zl).plot(label='ZB', color='tab:orange', ls='--')
-            smag.isel(zl=zl).plot(label='Smag', color='tab:green', ls='-.')
-            model.isel(zl=zl).plot(label='ZB+Smag', color='tab:blue')
+            zb20.isel(zl=zl).plot(label='Subgrid model', color='tab:orange', ls='--')
+            #smag.isel(zl=zl).plot(label='Smag', color='tab:green', ls='-.')
+            #model.isel(zl=zl).plot(label='ZB+Smag', color='tab:blue')
             plt.legend()
             plt.axhline(y=0,ls='-',color='gray',alpha=0.5)
             for k in [0.25, 0.5, 1]:

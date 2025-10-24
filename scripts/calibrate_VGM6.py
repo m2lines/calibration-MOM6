@@ -12,9 +12,9 @@ import argparse
 
 ## Global paths
 TAG = 'vgm6'
-hpc = HPC.add(name=TAG, time=2, executable='/scratch/pp2681/MOM6-examples/build/compiled_executables/MOM6-VGM6-Sep22-ver2')
+hpc = HPC.add(name=TAG, time=6, executable='/scratch/pp2681/MOM6-examples/build/compiled_executables/MOM6-VGM6-Sep22-ver3')
 base_path = '/scratch/pp2681/mom6/CM26_Double_Gyre/calibration/variability-R2-VGM6'
-optimization_folder = 'EKI-Vanilla'
+optimization_folder = 'EKI-Full'
 this_file = os.path.abspath(__file__)  # full path of current script
 script_name = os.path.basename(this_file)  # just the filename
 commandline = f'cd /home/pp2681/calibration/scripts; sbatch --mem=16GB --dependency=singleton --export=NONE --job-name={TAG} -o {base_path}/{optimization_folder}/slurm-%j.out -e {base_path}/{optimization_folder}/slurm-%j.err --wrap="python-jl {script_name}"'
@@ -37,7 +37,7 @@ exp_params = PARAMETERS.add(**configuration('R2')).add(DAYMAX=3650.0).add(USE_ZB
 observation = xr.open_dataset('/home/pp2681/calibration/scripts/R64_R2/full.nc')
 
 # EKI configuration
-N_iterations = 5
+N_iterations = 3
 N_ensemble = 40
 
 # Observation vector for EKI
@@ -72,11 +72,10 @@ Main.N_ensemble = N_ensemble
 
 Main.eval("""
     using EnsembleKalmanProcesses.ParameterDistributions
-    prior_1 = constrained_gaussian("VGM2", 1, 1, 0.0, Inf)
-    prior_2 = constrained_gaussian("VGM4", 1, 1, 0.0, Inf)
-    prior_3 = constrained_gaussian("VGM6", 1, 1, 0.0, Inf)
-    prior_4 = constrained_gaussian("Smag", 0, 0.25, -Inf, Inf)
-    prior = combine_distributions([prior_1, prior_2, prior_3, prior_4])
+    prior_1 = constrained_gaussian("VGM2", 1, 0.5, 0.0, 2.0)
+    prior_2 = constrained_gaussian("VGM4", 1, 0.5, 0.0, 2.0)
+    prior_3 = constrained_gaussian("VGM6", 1, 0.5, 0.0, 2.0)
+    prior = combine_distributions([prior_1, prior_2, prior_3])
 
     initial_ensemble = construct_initial_ensemble(prior, N_ensemble)
     """)
@@ -84,8 +83,6 @@ Main.eval("""
 Main.eval("""
     eki = EnsembleKalmanProcess(
     initial_ensemble, y, Γ, Inversion(),
-    scheduler = DefaultScheduler(1),
-    accelerator = DefaultAccelerator(),
     localization_method = EnsembleKalmanProcesses.Localizers.NoLocalization(),
     verbose=true)
     """)
@@ -100,7 +97,7 @@ nx = 11
 metrics['e_std'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble, nzl, ny, nx]), dims=['iter', 'ens', 'zi', 'yh', 'xh'])
 metrics['e_mean'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble, nzl, ny, nx]), dims=['iter', 'ens', 'zi', 'yh', 'xh'])
 metrics['EKE_spectrum'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble, nzl, nfreq_r]), dims=['iter', 'ens', 'zl', 'freq_r'])
-metrics['param'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble, 4]), dims=['iter', 'ens', 'pdim'])
+metrics['param'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble, 3]), dims=['iter', 'ens', 'pdim'])
 
 for iteration in range(N_iterations):
     print(f'################ iteration {iteration} ####################')
@@ -157,8 +154,7 @@ for iteration in range(N_iterations):
             MOM6_parameters = exp_params.add(
                 VGM6_c1 = param[0],
                 VGM6_c2 = param[1],
-                VGM6_c3 = param[2],
-                VGM6_c4 = param[3]
+                VGM6_c3 = param[2]
             )
 
             run_experiment(experiment_folder, hpc, MOM6_parameters)
