@@ -100,9 +100,9 @@ class Experiment:
     @property
     def Averaging_time(self):
         if np.max(self.prog.Time) > 3650:
-            Averaging_time = slice(3650,7300)
+            Averaging_time = slice(3650,None)
         else:
-            Averaging_time = slice(1825,3650)
+            Averaging_time = slice(1825,None)
         return Averaging_time
 
     @classmethod
@@ -440,7 +440,7 @@ class Experiment:
             g = self.vert_grid.g.isel(Interface=1)
         except:
             g = self.vert_grid.g.isel(zl=1)
-        return 0.5 * self.vert_grid.R.isel(zl=1)*g*((hint**2 - hbot**2) * self.param.dxT * self.param.dyT).sum(dim=('xh','yh')) # https://github.com/NOAA-GFDL/MOM6/blob/dev/gfdl/src/diagnostics/MOM_sum_output.F90#L657
+        return 0.5 * self.vert_grid.R.isel(zl=0)*g*((hint**2 - hbot**2) * self.param.dxT * self.param.dyT).sum(dim=('xh','yh')) # https://github.com/NOAA-GFDL/MOM6/blob/dev/gfdl/src/diagnostics/MOM_sum_output.F90#L657
     
     def PE_ssh(self, e):
         hint = e.isel(zi=0)

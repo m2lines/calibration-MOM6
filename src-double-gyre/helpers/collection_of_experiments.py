@@ -101,6 +101,50 @@ class CollectionOfExperiments:
 
         return cls(exps, experiments_dict, names_dict)
     
+    def plot_series(self, exps, labels=None, tstart=3650.):
+        fig, ax = plt.subplots(2,2,figsize=(20,8))
+        if labels is None:
+            labels=exps
+
+        p = []
+
+        colors = {exps[0]: 'gray', exps[-1]: 'k'}
+        lw = 2
+
+        for j,exp in enumerate(exps):
+            series = self[exp].series
+            KE = series.KE
+            APE = series.APE
+            t = series.Time
+
+            if (t>=tstart).sum() > 0:
+                KE_mean = KE[t >= tstart].mean('Time')
+                APE_mean = APE[t >= tstart].mean('Time')
+            else:
+                KE_mean = xr.DataArray([np.nan, np.nan], dims='Layer')
+                APE_mean = xr.DataArray([np.nan, np.nan, np.nan], dims='Interface')
+
+            im = KE.isel(Layer=0).plot(ax=ax[0,0], label=labels[j], color=colors.get(exp,None), lw=lw)
+            color = im[0].get_color()
+            ax[0,0].axhline(y = KE_mean.isel(Layer=0), linestyle='--', color=color)
+            im = KE.isel(Layer=1).plot(ax=ax[0,1], label=labels[j], color=colors.get(exp,None), lw=lw)
+            color = im[0].get_color()
+            ax[0,1].axhline(y = KE_mean.isel(Layer=1), linestyle='--', color=color)
+
+            im = APE.isel(Interface=0).plot(ax=ax[1,0], label=labels[j], color=colors.get(exp,None), lw=lw)
+            color = im[0].get_color()
+            ax[1,0].axhline(y = APE_mean.isel(Interface=0), linestyle='--', color=color)
+            im = APE.isel(Interface=1).plot(ax=ax[1,1], label=labels[j], color=colors.get(exp,None), lw=lw)
+            color = im[0].get_color()
+            ax[1,1].axhline(y = APE_mean.isel(Interface=1), linestyle='--', color=color)
+
+        ax[0,0].set_title('Upper Layer')
+        ax[0,1].set_title('Lower Layer')
+        ax[1,0].set_title('')
+        ax[1,1].set_title('')
+
+        ax[1,1].legend()
+
     def plot_KE_spectrum(self, exps, labels=None, key='EKE_spectrum', color=None, ls=None, filter_scale=-1):
         if labels is None:
             labels=exps

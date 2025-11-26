@@ -89,6 +89,14 @@ def configuration(exp='R4'):
             DT_FORCING=1080.
         )
 
+    if exp=='R8':
+        return dictionary(
+            NIGLOBAL=176,
+            NJGLOBAL=160,
+            DT=540.,
+            DT_FORCING=540.
+        )
+
 HPC = dictionary(
     nodes=1,
     ntasks=1,
@@ -100,7 +108,7 @@ HPC = dictionary(
 
 PARAMETERS = dictionary(
     DAYMAX=7300.0,
-    RESTINT=1825.0,
+    RESTINT=0,
     LAPLACIAN='False',
     BIHARMONIC='True',
     SMAGORINSKY_AH='True',
