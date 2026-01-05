@@ -11,13 +11,13 @@ import argparse
 #  python-jl calibrate_eANN_R2_FGR3_online_training_inflation_v2.py --echo
 
 ## Global paths
-TAG = 'INF2'
+TAG = 'ACC'
 base_path = '/scratch/pp2681/mom6/CM26_Double_Gyre/calibration/online_training'
-optimization_folder = 'R2_FGR3_inflation_v2'
+optimization_folder = 'R2_FGR3_inflation_v2_accelerated'
 ANN_default_path = '/scratch/pp2681/mom6/CM26_ML_models/ocean3d/subfilter/FGR3/equivariant/learning_rate/N8-forcing-fluxes/0.05/model/'
 this_file = os.path.abspath(__file__)  # full path of current script
 script_name = os.path.basename(this_file)  # just the filename
-commandline = f'cd /home/pp2681/calibration/scripts; sbatch --time=04:00:00 --mem=16GB --dependency=singleton --export=NONE --job-name={TAG} -o {base_path}/{optimization_folder}/slurm-%j.out -e {base_path}/{optimization_folder}/slurm-%j.err --wrap="python-jl {script_name}"'
+commandline = f'cd /home/pp2681/calibration/scripts; sbatch --time=00:30:00 --mem=16GB --dependency=singleton --export=NONE --job-name={TAG} -o {base_path}/{optimization_folder}/slurm-%j.out -e {base_path}/{optimization_folder}/slurm-%j.err --wrap="python-jl {script_name}"'
 # Here, we attenuate the spread of the initial ensemble as if not doing so, experiments explode
 ENS_SPREAD = 0.5
 
@@ -98,33 +98,46 @@ Main.y = y
 Main.Γ = Gamma
 Main.initial_ensemble = initial_ensemble
 
-Main.eval("""
-    eki = EnsembleKalmanProcess(
-    initial_ensemble, y, Diagonal(Γ), TransformInversion(),
-    scheduler = DefaultScheduler(0.5),
-    #scheduler = DataMisfitController(on_terminate="continue"),
-    accelerator = DefaultAccelerator(),
-    localization_method = EnsembleKalmanProcesses.Localizers.NoLocalization(),
-    verbose=true)
-    """)
+eki_state_file = f'{base_path}/{optimization_folder}/eki_state.jls' 
+Main.eki_state_file = eki_state_file
+if os.path.exists(eki_state_file):
+    Main.eval("""
+        using Serialization
+        eki = deserialize(eki_state_file)
+        """)
+else:
+    Main.eval("""
+        eki = EnsembleKalmanProcess(
+        initial_ensemble, y, Diagonal(Γ), TransformInversion(),
+        scheduler = DefaultScheduler(0.5),
+        #scheduler = DataMisfitController(on_terminate="continue"),
+        accelerator = DefaultAccelerator(),
+        localization_method = EnsembleKalmanProcesses.Localizers.NoLocalization(),
+        verbose=true)
+        """)
 
 os.makedirs(f'{base_path}/{optimization_folder}', exist_ok=True)
 
-metrics = xr.Dataset()
-Ntime = 20
-Nres = 1
-nzl = 2
-ny = 40
-nx = 44
-metrics['u'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble, Nres, Ntime, nzl, ny, nx+1]), dims=['iter', 'ens', 'res', 'Time', 'zl', 'yh', 'xq'])
-metrics['v'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble, Nres, Ntime, nzl, ny+1, nx]), dims=['iter', 'ens', 'res', 'Time', 'zl', 'yq', 'xh'])
-metrics['param'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble, initial_ensemble.shape[0]]), dims=['iter', 'ens', 'pdim'])
-metrics['RMSE_u'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble, Nres, Ntime, nzl]), dims=['iter', 'ens', 'res', 'Time', 'zl'])
-metrics['RMSE_v'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble, Nres, Ntime, nzl]), dims=['iter', 'ens', 'res', 'Time', 'zl'])
-metrics['WMSE'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble]), dims=['iter', 'ens'])
-metrics['WMSE_MAP'] = xr.DataArray(np.nan * np.zeros([N_iterations]), dims=['iter'])
+if os.path.exists(f'{base_path}/{optimization_folder}/metrics.nc'):
+    print('Metrics file already exists. Loading previous metrics...')
+    metrics = xr.open_dataset(f'{base_path}/{optimization_folder}/metrics.nc').load()
+else:
+    metrics = xr.Dataset()
+    Ntime = 20
+    Nres = 1
+    nzl = 2
+    ny = 40
+    nx = 44
+    metrics['u'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble, Nres, Ntime, nzl, ny, nx+1]), dims=['iter', 'ens', 'res', 'Time', 'zl', 'yh', 'xq'])
+    metrics['v'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble, Nres, Ntime, nzl, ny+1, nx]), dims=['iter', 'ens', 'res', 'Time', 'zl', 'yq', 'xh'])
+    metrics['param'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble, initial_ensemble.shape[0]]), dims=['iter', 'ens', 'pdim'])
+    metrics['RMSE_u'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble, Nres, Ntime, nzl]), dims=['iter', 'ens', 'res', 'Time', 'zl'])
+    metrics['RMSE_v'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble, Nres, Ntime, nzl]), dims=['iter', 'ens', 'res', 'Time', 'zl'])
+    metrics['WMSE'] = xr.DataArray(np.nan * np.zeros([N_iterations, N_ensemble]), dims=['iter', 'ens'])
+    metrics['WMSE_MAP'] = xr.DataArray(np.nan * np.zeros([N_iterations]), dims=['iter'])
+    metrics['latest_iteration'] = 0    
 
-for iteration in range(N_iterations):
+for iteration in range(int(metrics['latest_iteration'].item()), N_iterations):
     print(f'################ iteration {iteration} ####################')
     # Return the parameters in unconstrained space
     params = Main.eval("get_u_final(eki)")
@@ -181,6 +194,7 @@ for iteration in range(N_iterations):
         metrics['RMSE_u'] = np.sqrt(((metrics['u'] - observation['u'])**2).mean(dim=['xq','yh']))
         metrics['RMSE_v'] = np.sqrt(((metrics['v'] - observation['v'])**2).mean(dim=['xh','yq']))
         metrics['WMSE_MAP'][iteration] = ((y - np.nanmean(g_ens, axis=1))**2 / Gamma).mean()
+        metrics['latest_iteration'] = metrics['latest_iteration'] + 1
         
         os.system(f'rm -f {base_path}/{optimization_folder}/metrics.nc')
         metrics.astype('float32').to_netcdf(f'{base_path}/{optimization_folder}/metrics.nc')
@@ -195,6 +209,13 @@ for iteration in range(N_iterations):
         # For example, we seen that DMC commonly increase the step size, thus, this may result to negative factor
         # 1/(1-dt*s) with dt*s > 1. We avoid that. Our factor is always 2 = 1/(1-0.5*1) 
         Main.eval("update_ensemble!(eki, g_ens; multiplicative_inflation = true, s = 0.5)")
+
+        os.system(f'rm -f {eki_state_file}')
+        Main.eval("""
+                using Serialization
+                serialize(eki_state_file, eki)
+            """)
+
         print('Forward model evaluations are passed to the EKI. Going to the next iterations...')
     else:
         print('Run experiments in folder ', iteration_path)
