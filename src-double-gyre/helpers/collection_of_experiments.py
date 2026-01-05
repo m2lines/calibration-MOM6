@@ -78,7 +78,7 @@ class CollectionOfExperiments:
         '''
         folders = []
         for root, dirs, files in os.walk(common_folder):
-            if os.path.isfile(os.path.join(root, additional_subfolder, 'ocean.stats.nc')):
+            if os.path.isfile(os.path.join(root, additional_subfolder, 'ocean_geometry.nc')):
                 folder = root[len(common_folder)+1:] # Path w.r.t. common_folder
                 folders.append(
                     folder
@@ -101,7 +101,7 @@ class CollectionOfExperiments:
 
         return cls(exps, experiments_dict, names_dict)
     
-    def plot_series(self, exps, labels=None, tstart=3650.):
+    def plot_series(self, exps, labels=None, tstart=3650., tmax=None):
         fig, ax = plt.subplots(2,2,figsize=(20,8))
         if labels is None:
             labels=exps
@@ -112,18 +112,26 @@ class CollectionOfExperiments:
         lw = 2
 
         for j,exp in enumerate(exps):
-            series = self[exp].series
-            KE = series.KE
-            APE = series.APE
-            t = series.Time
+            try:
+                series = self[exp].series
+                KE = series.KE
+                APE = series.APE
+                t = series.Time
+            except:
+                KE = self[exp].KE_joul_series.rename({'zl': 'Layer'})
+                APE = xr.concat([self[exp].PE_ssh_series, self[exp].PE_joul_series], dim='Interface')
+                t = KE.Time
 
+            KE = KE.transpose('Time',...).compute()
+            APE = APE.transpose('Time',...).compute()
+            
             if (t>=tstart).sum() > 0:
                 KE_mean = KE[t >= tstart].mean('Time')
                 APE_mean = APE[t >= tstart].mean('Time')
             else:
                 KE_mean = xr.DataArray([np.nan, np.nan], dims='Layer')
                 APE_mean = xr.DataArray([np.nan, np.nan, np.nan], dims='Interface')
-
+            
             im = KE.isel(Layer=0).plot(ax=ax[0,0], label=labels[j], color=colors.get(exp,None), lw=lw)
             color = im[0].get_color()
             ax[0,0].axhline(y = KE_mean.isel(Layer=0), linestyle='--', color=color)
@@ -142,6 +150,11 @@ class CollectionOfExperiments:
         ax[0,1].set_title('Lower Layer')
         ax[1,0].set_title('')
         ax[1,1].set_title('')
+
+        ax[0,0].set_xlim([0, tmax])
+        ax[0,1].set_xlim([0, tmax])
+        ax[1,0].set_xlim([0, tmax])
+        ax[1,1].set_xlim([0, tmax])
 
         ax[1,1].legend()
 
@@ -331,7 +344,7 @@ class CollectionOfExperiments:
             plt.ylabel('Power spectrum [m$^3$/s$^4$]')
             plt.title('')
             
-    def plot_ssh(self, exps, labels=None, target=None, ncols=3):
+    def plot_ssh(self, exps, labels=None, target=None, ncols=3, zi=0):
         if labels is None:
             labels=exps
         nfig = len(exps)
@@ -342,21 +355,28 @@ class CollectionOfExperiments:
         else:
             nrows = 1
 
+        if zi ==0:
+            levels_field = np.arange(-4,4.5,0.5)
+            levels_bias = np.arange(-2,2.2,0.2)
+        else:
+            levels_field = np.arange(-1400,-550,50)
+            levels_bias = np.arange(-100,110,10)
+
         plt.figure(figsize=(5*ncol,4*nrows))
         plt.subplots_adjust(hspace=0.3, wspace=0.3)
 
         for ifig, exp in enumerate(exps):
             plt.subplot(nrows,ncol,ifig+1)
             if target is None or target == exp:
-                ssh = self[exp].ssh_mean
-                levels = np.arange(-4,4.5,0.5)
+                ssh = self[exp].e_mean.isel(zi=zi)
+                levels = levels_field
                 label = 'SSH [m]'
                 lines = True
             else:
-                ssh = self[exp].ssh_mean
-                ssh = ssh - remesh(self[target].ssh_mean,ssh)
-                levels = np.linspace(-2,2,21)
-                label = 'SSH error [m]'
+                ssh = self[exp].e_mean.isel(zi=zi)
+                ssh = ssh - remesh(self[target].e_mean.isel(zi=zi),ssh)
+                levels = levels_bias
+                label = 'SSH bias [m]'
                 lines = False
             ssh.plot.contourf(levels=levels, cmap='bwr', linewidths=1, extend='both', cbar_kwargs={'label': label})
             if lines:
@@ -369,13 +389,13 @@ class CollectionOfExperiments:
             plt.title(labels[ifig])
 
             if exp != exps[-1]:
-                RMSE = Lk_error(self[exp].ssh_mean,self[exps[-1]].ssh_mean)[0]
+                RMSE = Lk_error(self[exp].e_mean.isel(zi=zi),self[exps[-1]].e_mean.isel(zi=zi))[0]
                 #print(RMSE)
                 plt.text(9,31,'RMSE='+str(round(RMSE,3))+'$m$', fontsize=14)
 
         plt.tight_layout()
 
-    def plot_ssh_std(self, exps, labels=None, target=None, ncols=3):
+    def plot_ssh_std(self, exps, labels=None, target=None, ncols=3, zi=0):
         if labels is None:
             labels=exps
         nfig = len(exps)
@@ -386,13 +406,19 @@ class CollectionOfExperiments:
         else:
             nrows = 1
 
+        if target is None:
+            target = exps[-1]
+
         plt.figure(figsize=(5*ncol,4*nrows))
         plt.subplots_adjust(hspace=0.3, wspace=0.3)
 
         for ifig, exp in enumerate(exps):
             plt.subplot(nrows,ncol,ifig+1)
-            ssh = remesh(self[exp].ssh_std,self[target].ssh_std)
-            levels = np.arange(0,1.3,0.1)
+            ssh = remesh(self[exp].e_std.isel(zi=zi),self[target].e_std.isel(zi=zi))
+            if zi==0:
+                levels = np.arange(0,1.1,0.1)
+            else:
+                levels = np.arange(0,110,10)
             label = 'SSH std [m]'
 
             ssh.plot.contourf(levels=levels, cmap=cmocean.cm.balance, linewidths=1, cbar_kwargs={'label': label})
@@ -403,7 +429,7 @@ class CollectionOfExperiments:
             plt.title(labels[ifig])
 
             if exp != exps[-1]:
-                RMSE = Lk_error(ssh,remesh(self[exps[-1]].ssh_std, self[target].ssh_std))[0]
+                RMSE = Lk_error(ssh,remesh(self[exps[-1]].e_std.isel(zi=zi), self[target].e_std.isel(zi=zi)))[0]
                 plt.text(9,31,'RMSE='+str(round(RMSE,3))+'$m$', fontsize=14, color='w')
 
         plt.tight_layout()
@@ -505,6 +531,36 @@ class CollectionOfExperiments:
         cbar.set_label(label='Surface velocity, m/s' , fontsize=14)
         cbar.set_ticks(ticks=[2e-2, 0.05, 0.1, 0.2, 0.5], labels=[2e-2, 0.05, 0.1, 0.2, 0.5])
 
+    def plot_ssh_snapshot(self, exps, labels=None, idx=-1, ncols=3, zi=0, vmax=2):
+        if labels is None:
+            labels=exps
+        nfig = len(exps)
+        ncol = min(ncols,nfig)
+        nrows = nfig / ncols
+        if nrows > 1:
+            nrows = int(np.ceil(nrows))
+        else:
+            nrows = 1
+        plt.figure(figsize=(5*ncol,4*nrows))
+        plt.subplots_adjust(hspace=0.3, wspace=0.3)
+        for ifig, exp in enumerate(exps):
+            plt.subplot(nrows,ncol,ifig+1)
+            field = self[exp].e.isel(zi=zi,Time=idx)
+            if zi==1:
+                field = field+1000.
+            im = field.plot.imshow(vmin=-vmax, add_colorbar=False, interpolation='none')
+            plt.xticks([0,5,10,15,20])
+            plt.yticks([30,35,40,45,50])
+            plt.xlim([0,22])
+            plt.ylim([30,50])
+            plt.xlabel('Longitude')
+            plt.ylabel('Latitude')
+            plt.title(labels[ifig])
+            plt.gca().set_aspect(1)
+        
+        cbar = plt.colorbar(im, ax=plt.gcf().axes, extend='both')
+        cbar.set_label(label='Sea surface height [m]' , fontsize=14)
+
     def plot_logKEz(self, exps, labels=None, idx=-1, ncols=3):
         if labels is None:
             labels=exps
@@ -537,15 +593,15 @@ class CollectionOfExperiments:
         cbar.set_label(label='Depth-integrated KE, m$^3$s$^{-2}$', fontsize=12)
         cbar.set_ticks(ticks=[1e-1, 1e0, 1e1, 1e2])
 
-    def plot_velocity(self, exps, labels=None, key='u_mean'):
+    def plot_velocity(self, exps, labels=None, key='u_mean', zl=0, vmax=0.3):
         if labels is None:
             labels=exps
         plt.figure(figsize=(4*len(exps),3))
         nfig = len(exps)
         for ifig, exp in enumerate(exps):
             plt.subplot(1,nfig,ifig+1)
-            v = self[exp].__getattribute__(key).isel(zl=0)
-            levels = np.linspace(-0.3,0.3,21)
+            v = self[exp].__getattribute__(key).isel(zl=zl)
+            levels = np.linspace(-vmax,vmax,21)
             label = 'Velocity [$m/s$]'
             v.plot.contourf(levels=levels, cmap='bwr', linewidths=1, extend='both', cbar_kwargs={'label': label})
             plt.xticks((0, 5, 10, 15, 20))
@@ -553,6 +609,9 @@ class CollectionOfExperiments:
             plt.xlabel('Longitude')
             plt.ylabel('Latitude')
             plt.title(labels[ifig])
+            if exp != exps[-1]:
+                RMSE = Lk_error(self[exp].__getattribute__(key).isel(zl=zl),self[exps[-1]].__getattribute__(key).isel(zl=zl))[0]
+                plt.text(1,31,'RMSE='+str(round(RMSE,5))+'$m$', fontsize=14)
 
         plt.tight_layout()
 

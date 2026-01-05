@@ -206,19 +206,31 @@ class Experiment:
 
     @main_property
     def ua(self):
-        return self.ave.u
+        try:
+            return self.ave.u
+        except:
+            return self.prog.u
 
     @main_property
     def va(self):
-        return self.ave.v
+        try:
+            return self.ave.v
+        except:
+            return self.prog.v
 
     @main_property
     def ea(self):
-        return self.ave.e
+        try:
+            return self.ave.e
+        except:
+            return self.prog.e
 
     @main_property
     def ha(self):
-        return self.ave.h
+        try:
+            return self.ave.h
+        except:
+            return self.prog.h
 
     ######################## Auxiliary variables #########################
     @main_property
@@ -281,8 +293,37 @@ class Experiment:
     def e_mean(self):
         return self.ea.sel(Time=self.Averaging_time).mean(dim='Time')
 
+    @netcdf_property
+    def e_std(self):
+        return self.e.sel(Time=self.Averaging_time).std(dim='Time')
+
     def average(self, prop):
         return eval(f'self.{prop}').sel(Time=self.Averaging_time).mean(dim='Time')
+
+    # ---------------------------- PDFs ---------------------------------#
+    @netcdf_property
+    def pdf_RV(self):
+        RV = self.RV_f.isel(zl=0).sel(Time=self.Averaging_time)
+        hist, bin_edges = np.histogram(RV.values.flatten(), bins=np.linspace(-0.2,0.2,50), density=True)
+        return xr.DataArray(hist, coords=[0.5*(bin_edges[1:]+bin_edges[:-1])], dims=['RV_f'])
+
+    @netcdf_property
+    def pdf_ssh(self):
+        ssh = self.e.isel(zi=0).sel(Time=self.Averaging_time)
+        hist, bin_edges = np.histogram(ssh.values.flatten(), bins=np.linspace(-3,3,50), density=True)
+        return xr.DataArray(hist, coords=[0.5*(bin_edges[1:]+bin_edges[:-1])], dims=['ssh'])
+
+    @netcdf_property
+    def pdf_u(self):
+        u = self.u.isel(zl=0).sel(Time=self.Averaging_time)
+        hist, bin_edges = np.histogram(u.values.flatten(), bins=np.linspace(-0.5,0.5,50), density=True)
+        return xr.DataArray(hist, coords=[0.5*(bin_edges[1:]+bin_edges[:-1])], dims=['u'])
+
+    @netcdf_property
+    def pdf_v(self):
+        v = self.u.isel(zl=0).sel(Time=self.Averaging_time)
+        hist, bin_edges = np.histogram(v.values.flatten(), bins=np.linspace(-0.5,0.5,50), density=True)
+        return xr.DataArray(hist, coords=[0.5*(bin_edges[1:]+bin_edges[:-1])], dims=['v'])
 
     #-----------------------  Spectral analysis  ------------------------#
     @netcdf_property
@@ -417,15 +458,15 @@ class Experiment:
     def KE_joul(self, u, v, h):
         return (0.5 * self.vert_grid.R * (remesh(u**2, h) + remesh(v**2, h)) * h * self.param.dxT * self.param.dyT).sum(dim=('xh','yh'))
 
-    @property
+    @netcdf_property
     def KE_joul_series(self):
         return self.KE_joul(self.u, self.v, self.h)
 
-    @property
+    @netcdf_property
     def MKE_joul(self):
         return self.KE_joul(self.u_mean, self.v_mean, self.h_mean)
     
-    @property
+    @netcdf_property
     def EKE_joul(self):
         return self.KE_joul_series.sel(Time=self.Averaging_time).mean(dim='Time') - self.MKE_joul
     

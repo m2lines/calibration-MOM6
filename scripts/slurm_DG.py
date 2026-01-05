@@ -21,6 +21,9 @@ def create_slurm(p, filename, call_function):
     '#SBATCH --job-name='+str(p['name']),
     '#SBATCH --export=NONE',
 
+    
+    'scontrol show job $SLURM_JOB_ID',
+
     call_function,
     
     'module purge',
@@ -30,7 +33,11 @@ def create_slurm(p, filename, call_function):
     'mpiexec --bind-to none -np ' + str(p['ntasks']) + ' env LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ' + p['executable'],
 
     'mkdir -p output',
-    'mv *.nc output'
+    'mv *.nc output',
+
+    'if [ $? -ne 0 ]; then',
+    '    sbatch --exclude=$SLURM_JOB_NODELIST --begin=now+1minute $0',
+    'fi'
     ]
     with open(filename,'w') as fid:
         fid.writelines([ line+'\n' for line in lines])
@@ -43,7 +50,7 @@ def create_MOM_override(p, filename):
     with open(filename,'w') as fid:
         fid.writelines([ line+'\n' for line in lines])
 
-def run_experiment(folder, hpc, parameters, call_function=''):
+def run_experiment(folder, hpc, parameters, call_function='', *further_commands):
     if os.path.exists(folder):
         print('Folder '+folder+' already exists. We skip it')
         return
@@ -53,6 +60,10 @@ def run_experiment(folder, hpc, parameters, call_function=''):
     create_MOM_override(parameters, os.path.join(folder,'MOM_override'))
     
     os.system('cp -r /home/pp2681/MOM6-examples/build/configurations/double_gyre/* '+folder)
+
+    for cmd in further_commands:
+        #print('Executing further command:', cmd)
+        os.system(cmd)
 
     with open(os.path.join(folder,'args.json'), 'w') as f:
         json.dump(parameters, f, indent=2)

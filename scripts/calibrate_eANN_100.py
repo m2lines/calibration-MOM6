@@ -40,7 +40,7 @@ ANN_netcdf_default = xr.open_dataset(f'{ANN_default_path}/eANN.nc').load()
 observation = xr.open_dataset('/home/pp2681/calibration/scripts/R32/R2_ssh.nc')
 
 # EKI configuration
-N_iterations = 2
+N_iterations = 5
 N_ensemble = 30
 
 np.random.seed(0)
