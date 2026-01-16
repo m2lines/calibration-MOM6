@@ -13,13 +13,14 @@ import argparse
 ## Global paths
 TAG = '100y'
 base_path = '/scratch/pp2681/mom6/CM26_Double_Gyre/calibration/hundred-years'
-optimization_folder = 'R2_R4_R8'
-ANN_default_path = '/scratch/pp2681/mom6/CM26_ML_models/ocean3d/subfilter/FGR3/equivariant/learning_rate/N8-forcing-fluxes/0.05/model/'
+optimization_folder = 'R2_R4_R8_restart'
+#ANN_default_path = '/scratch/pp2681/mom6/CM26_ML_models/ocean3d/subfilter/FGR3/equivariant/learning_rate/N8-forcing-fluxes/0.05/model/'
+ANN_default_path = '/scratch/pp2681/mom6/CM26_Double_Gyre/calibration/hundred-years/R2_R4_R8/iteration-04/R2/ens-member-00/INPUT/'
 this_file = os.path.abspath(__file__)  # full path of current script
 script_name = os.path.basename(this_file)  # just the filename
 commandline = f'cd /home/pp2681/calibration/scripts; sbatch --mem=16GB --dependency=singleton --export=NONE --job-name={TAG} -o {base_path}/{optimization_folder}/slurm-%j.out -e {base_path}/{optimization_folder}/slurm-%j.err --wrap="python-jl {script_name}"'
 # Here, we attenuate the spread of the initial ensemble as if not doing so, experiments explode
-ENS_SPREAD = 0.25
+ENS_SPREAD = 0.15
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -43,7 +44,7 @@ observation = xr.open_dataset('/home/pp2681/calibration/scripts/R32/R2_ssh.nc')
 N_iterations = 5
 N_ensemble = 30
 
-np.random.seed(0)
+np.random.seed(1)
 # Initial ensemble for EKI
 # 13 x 30 matrix; (For 64 neurons and N8 symmetries)
 def generate_ensemble_for_parameter_vector(parameter_key):
@@ -207,7 +208,11 @@ for iteration in range(N_iterations):
                 if RR == 'R8':
                     hpc = HPC.add(name=TAG, time=48, ntasks=16, mem=4, begin='1minute', executable='/scratch/pp2681/MOM6-examples/build/compiled_executables/MOM6-dev-m2lines-Aug18')
                 
-                run_experiment(experiment_folder, hpc, exp_params.add(**configuration(RR)), call_function)
+                further_command = f'cp {experiment_folder}/diag_table.long {experiment_folder}/diag_table'
+                run_experiment(experiment_folder, hpc, exp_params.add(**configuration(RR)), 
+                    '/home/pp2681/MOM6-examples/build/configurations/double_gyre',
+                    call_function,
+                    further_command)
                 # We save data after initializing experiment to do not interrupt workflow.
                 os.makedirs(f'{experiment_folder}/INPUT', exist_ok=True)
                 weights_netcdf.astype('float32').to_netcdf(f'{experiment_folder}/INPUT/eANN.nc')

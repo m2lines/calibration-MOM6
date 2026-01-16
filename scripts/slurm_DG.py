@@ -50,7 +50,7 @@ def create_MOM_override(p, filename):
     with open(filename,'w') as fid:
         fid.writelines([ line+'\n' for line in lines])
 
-def run_experiment(folder, hpc, parameters, call_function='', *further_commands):
+def run_experiment(folder, hpc, parameters, clean_experiment='/home/pp2681/MOM6-examples/build/configurations/double_gyre', call_function='', *further_commands):
     if os.path.exists(folder):
         print('Folder '+folder+' already exists. We skip it')
         return
@@ -59,7 +59,7 @@ def run_experiment(folder, hpc, parameters, call_function='', *further_commands)
     create_slurm(hpc, os.path.join(folder,'mom.sub'), call_function)
     create_MOM_override(parameters, os.path.join(folder,'MOM_override'))
     
-    os.system('cp -r /home/pp2681/MOM6-examples/build/configurations/double_gyre/* '+folder)
+    os.system(f'cp -r {clean_experiment}/* '+folder)
 
     for cmd in further_commands:
         #print('Executing further command:', cmd)
@@ -135,3 +135,17 @@ PARAMETERS = dictionary(
     U_TRUNC_FILE = 'U_velocity_truncations',
     V_TRUNC_FILE = 'V_velocity_truncations'
 ) + configuration('R4')
+
+PARAMETERS_NW2 = dictionary(
+    DAYMAX=2000.0,
+    NIGLOBAL=120,
+    NJGLOBAL=280,
+    DT=900.,
+    HMIX_UV_SFC_PROP=5.0,
+    INTERNAL_WAVE_SPEED_BETTER_EST='False',
+    SMAG_BI_CONST=0.06,
+    BOUND_CORIOLIS_BIHARM = 'True',
+    MAXTRUNC = 100000,
+    U_TRUNC_FILE = 'U_velocity_truncations',
+    V_TRUNC_FILE = 'V_velocity_truncations'
+)
