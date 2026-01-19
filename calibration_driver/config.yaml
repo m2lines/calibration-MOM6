@@ -33,6 +33,6 @@ slurm_eki: "sbatch --time=06:00:00 --cpus-per-task=4 --mem=16GB"
 slurm_mom6:
   time: 1
 
-    #singularity_command: "singularity exec --nv --overlay /scratch/$USER/python-container/python-overlay.ext3:ro --bind /scratch/pp2681/python-container/escnn-cache:/ext3/miniconda3/lib/python3.11/site-packages/escnn/group/_cache/ /share/apps/images/cuda12.3.2-cudnn9.0.0-ubuntu-22.04.4.sif"
+#singularity_command: "singularity exec --nv --overlay /scratch/$USER/python-container/python-overlay.ext3:ro --bind /scratch/pp2681/python-container/escnn-cache:/ext3/miniconda3/lib/python3.11/site-packages/escnn/group/_cache/ /share/apps/images/cuda12.3.2-cudnn9.0.0-ubuntu-22.04.4.sif"
 
 singularity_command: "singularity exec --nv --overlay /scratch/$USER/python-container/python-overlay.ext3:ro --bind /scratch/pp2681/python-container/escnn-cache:/ext3/miniconda3/lib/python3.11/site-packages/escnn/group/_cache/ /scratch/work/public/singularity/cuda11.6.124-cudnn8.4.0.27-devel-ubuntu20.04.4.sif "

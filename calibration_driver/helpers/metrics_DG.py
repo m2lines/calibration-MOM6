@@ -23,6 +23,14 @@ def return_climate_metrics(exp_path, *metrics):
                 metrics_data[metric] = prog.e.mean('Time').values
             case "e_std":
                 metrics_data[metric] = prog.e.std('Time').values
+            case "u_mean":
+                metrics_data[metric] = prog.u.mean('Time').values
+            case "v_mean":
+                metrics_data[metric] = prog.v.mean('Time').values
+            case "u_std":
+                metrics_data[metric] = prog.u.std('Time').values
+            case "v_std":
+                metrics_data[metric] = prog.v.std('Time').values
 
     prog.close()
     series.close()
