@@ -47,7 +47,7 @@ gamma_vector = np.concatenate(gamma_vector)
 ############ Initialize EKI process #############
 initialize_eki(observation_vector, gamma_vector, initial_ensemble, config["eki"]["scheduler"], config["eki"]["inversion"], config["eki"]["seed"], optimization_folder_pwd)
 
-for iteration in range(args['latest_iteration'], config["eki"]["n_iterations"]):
+for iteration in range(args.latest_iteration, config["eki"]["n_iterations"]):
     print(f'################ iteration {iteration} ####################')
     params = eki_get_params()
 
@@ -66,7 +66,7 @@ for iteration in range(args['latest_iteration'], config["eki"]["n_iterations"]):
         for ens_member in range(config["eki"]["ens_size"]):
             exp_path = f"{iteration_path}/ens-member-{ens_member:02d}/output"
             metrics_function = eval(config["eki"]["metrics_function"]) 
-            metrics_data = metrics_function(exp_path, *config["eki"]["observation_vector"])
+            metrics_data = metrics_function(exp_path, config["mom6_namelist"]["DAYMAX"], *config["eki"]["observation_vector"])
 
             if isinstance(metrics_data, dict):
                 g_ens[:,ens_member] = np.concatenate([metrics_data[metric].ravel() for metric in config["eki"]["observation_vector"]])
@@ -82,7 +82,7 @@ for iteration in range(args['latest_iteration'], config["eki"]["n_iterations"]):
                 else:
                     metrics_netcdf[metric] = observation_netcdf[metric]*np.nan
                 
-            # Compute L2-norms
+            # Compute Weighted Squared Errors
             for metric, metric_var in zip(config["eki"]["observation_vector"], config["eki"]["gamma_vector"]):
                 error = metrics_netcdf[metric] - observation_netcdf[metric]
                 variance = observation_netcdf[metric_var]
@@ -90,7 +90,9 @@ for iteration in range(args['latest_iteration'], config["eki"]["n_iterations"]):
                 for dim in ['xh', 'yh', 'xq', 'yq']:
                     if dim in error.dims:
                         spatial_ave_dims.append(dim)
-                metrics_netcdf[metric+'_L2'] = np.sqrt((error * error / variance).sum(spatial_ave_dims))
+                metrics_netcdf[metric+'_WSE'] = (error * error / variance).sum(spatial_ave_dims, skipna=False)
+                metrics_netcdf[metric+'_RMSE'] = np.sqrt((error * error).mean(spatial_ave_dims, skipna=False))
+            metrics_netcdf['WMSE'] = np.sum([metrics_netcdf[metric+'_WSE'] for metric in config["eki"]["observation_vector"]]) / len(observation_vector)
             metrics_netcdf_list.append(metrics_netcdf)
         
         print('Passing forward model evaluations to the EKI')
@@ -98,12 +100,24 @@ for iteration in range(args['latest_iteration'], config["eki"]["n_iterations"]):
         print('Forward model evaluations are passed to the EKI. Going to the next iterations...')
 
         print('Saving EKI to disk')
-        save_eki_on_disk()
+        save_eki_on_disk(optimization_folder_pwd)
 
         print('Saving metrics to disk')
-        metrics_netcdf = xr.concatenate(metrics_netcdf_list, dims='ens')
-        metrics_netcdf['param'] = xr.DataArray(params, dims=['pdim', 'ens'])
-        metrics_netcdf.transpose('ens',...).to_netcdf(f'{optimization_folder_pwd}/metrics_{iteration}.nc')
+        metrics_netcdf = xr.concat(metrics_netcdf_list, dim='ens')
+        metrics_netcdf['param'] = xr.DataArray(params, dims=['pdim', 'ens']).transpose('ens',...)
+
+        # Compute Weighted Squared Errors
+        for metric, metric_var in zip(config["eki"]["observation_vector"], config["eki"]["gamma_vector"]):
+            error = metrics_netcdf[metric].mean('ens') - observation_netcdf[metric]
+            variance = observation_netcdf[metric_var]
+            spatial_ave_dims = []
+            for dim in ['xh', 'yh', 'xq', 'yq']:
+                if dim in error.dims:
+                    spatial_ave_dims.append(dim)
+            metrics_netcdf[metric+'_WSE_MAP'] = (error * error / variance).sum(spatial_ave_dims)
+            metrics_netcdf[metric+'_RMSE_MAP'] = np.sqrt((error * error).mean(spatial_ave_dims, skipna=False))
+        metrics_netcdf['WMSE_MAP'] = np.sum([metrics_netcdf[metric+'_WSE_MAP'] for metric in config["eki"]["observation_vector"]]) / len(observation_vector)
+        metrics_netcdf.to_netcdf(f'{optimization_folder_pwd}/metrics_{iteration}.nc')
     else:
         print('Run experiments in folder ', iteration_path)
         for ens_member in range(config["eki"]["ens_size"]):

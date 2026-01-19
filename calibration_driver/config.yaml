@@ -21,7 +21,7 @@ eki:
   metrics_function: "return_climate_metrics"
 
 mom6_namelist:
-  daymax: 7300.0
+  DAYMAX: 7300.0
   USE_ZB2020: "True"
   ZB2020_USE_ANN: "True"
   ZB2020_ANN_FILE_TALL: "INPUT/Tall.nc"
