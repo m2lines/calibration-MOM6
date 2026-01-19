@@ -1,6 +1,6 @@
 import os
 import sys
-sys.path.append('.')
+sys.path.append('/home/pp2681/calibration/calibration_driver')
 import numpy as np
 import xarray as xr
 from helpers.slurm_DG import *
@@ -130,7 +130,7 @@ for iteration in range(args['latest_iteration'], config["eki"]["n_iterations"]):
         print('Putting in a queue resubmission script')
         this_file = os.path.abspath(__file__)  # full path of current script
         script_name = os.path.basename(this_file)  # just the filename
-        commandline = f'cd /home/pp2681/calibration/calibration_driver; {config["slurm_eki"]} --dependency=singleton --export=NONE --job-name={config["tag"]} -o {optimization_folder_pwd}/slurm-%j.out -e {optimization_folder_pwd}/slurm-%j.err --wrap="python-jl {script_name} --latest_iteration={iteration}"'
+        commandline = f'cd {os.getcwd()}; {config["slurm_eki"]} --dependency=singleton --export=NONE --job-name={config["tag"]} -o {optimization_folder_pwd}/slurm-%j.out -e {optimization_folder_pwd}/slurm-%j.err --wrap="python-jl {script_name} --latest_iteration={iteration}"'
         os.system(commandline)
         print('Exiting the script')
         sys.exit(0)   # terminate immediately without error code
