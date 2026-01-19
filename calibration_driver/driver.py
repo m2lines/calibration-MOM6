@@ -1,6 +1,6 @@
 import os
 import sys
-sys.path.append('helpers')
+sys.path.append('.')
 import numpy as np
 import xarray as xr
 from helpers.slurm_DG import *
@@ -18,7 +18,7 @@ print(config)
 this_file = os.path.abspath(__file__)  # full path of current script
 script_name = os.path.basename(this_file)  # just the filename
 optimization_folder_pwd = os.path.join(config["paths"]["base"], config["paths"]["optimization_folder"])
-commandline = f'cd /home/pp2681/calibration/scripts_torch; {config["slurm_eki"]} --dependency=singleton --export=NONE --job-name={TAG} -o {optimization_folder_pwd}/slurm-%j.out -e {optimization_folder_pwd}/slurm-%j.err --wrap="python-jl {script_name}"'
+commandline = f'cd /home/pp2681/calibration/calibration_driver; {config["slurm_eki"]} --dependency=singleton --export=NONE --job-name={config["tag"]} -o {optimization_folder_pwd}/slurm-%j.out -e {optimization_folder_pwd}/slurm-%j.err --wrap="python-jl {script_name}"'
 os.makedirs(f'{optimization_folder_pwd}', exist_ok=True)
 
 ############### Create initial ensemble ################
@@ -78,17 +78,15 @@ for iteration in range(config["eki"]["n_iterations"]):
         print('Run experiments in folder ', iteration_path)
         for ens_member in range(config["eki"]["ens_size"]):
             exp_path = f"{iteration_path}/ens-member-{ens_member:02d}"
-            ANN_modified = parameter_vector_to_ANN(ANN_netcdf_default, config["eki"]["observation_vector"], num_of_parameters, params[:,ens_member])
+            ANN_modified = parameter_vector_to_ANN(ANN_netcdf_default, config["eki"]["trainable_parameters"], num_of_parameters, params[:,ens_member])
 
-            call_function = ('singularity exec --nv --overlay /scratch/$USER/python-container/python-overlay.ext3:ro '
-                            '--bind /scratch/pp2681/python-container/escnn-cache:/ext3/miniconda3/lib/python3.11/site-packages/escnn/group/_cache/ '
-                            ' /share/apps/images/cuda12.3.2-cudnn9.0.0-ubuntu-22.04.4.sif '
-                            f' /bin/bash -c "source /ext3/env.sh; time python /home/pp2681/calibration/scripts/eANN_to_ANN.py --netcdf_ANN={config["paths"]["ann"]}/Tall.nc --netcdf_eANN={exp_path}/INPUT/eANN.nc --netcdf_output={exp_path}/INPUT/Tall.nc"')
+            call_function = config["singularity_command"] + \
+                            f' /bin/bash -c "source /ext3/env.sh; time python /home/pp2681/calibration/scripts/eANN_to_ANN.py --netcdf_ANN={config["paths"]["ann"]}/Tall.nc --netcdf_eANN={exp_path}/INPUT/eANN.nc --netcdf_output={exp_path}/INPUT/Tall.nc"'
 
             hpc = HPC.add(name=config["tag"], time=config["slurm_mom6"]["time"], begin='1minute', executable=config["paths"]["executable"])
 
             # Model configuration
-            exp_params = PARAMETERS.add(*config["mom6_namelist"]).add(**configuration('R2'))
+            exp_params = PARAMETERS.add(**configuration('R2')).add(**config["mom6_namelist"])
             
             run_experiment(exp_path, hpc, exp_params,
                 config["paths"]["configuration"],

@@ -1,3 +1,5 @@
+import numpy as np
+
 def generate_ensemble(ANN_netcdf, parameter_list, ensemble_spread, ensemble_size):
     '''
     Receives neural network netcdf object, parameter_list to perturb,
@@ -35,6 +37,6 @@ def parameter_vector_to_ANN(ANN_netcdf, parameter_list, num_of_parameters, param
     for j, parameter_key in enumerate(parameter_list):
         idx_start = sum(num_of_parameters[:j])
         idx_end = idx_start + num_of_parameters[j]
-        ANN_modified[parameter_key] = parameter_vector[idx_start:idx_end]
+        ANN_modified[parameter_key].data = parameter_vector[idx_start:idx_end]
 
     return ANN_modified
