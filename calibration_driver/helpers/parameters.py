@@ -1,4 +1,5 @@
 import numpy as np
+import os
 
 def generate_ensemble(ANN_netcdf, parameter_list, ensemble_spread, ensemble_size):
     '''
@@ -40,3 +41,17 @@ def parameter_vector_to_ANN(ANN_netcdf, parameter_list, num_of_parameters, param
         ANN_modified[parameter_key].data = parameter_vector[idx_start:idx_end]
 
     return ANN_modified
+
+def save_params_txt(params, iteration_path):
+    params_file = f'{iteration_path}-params.txt'
+
+    if not(os.path.exists(params_file)):
+        print('Saving parameters to file', params_file)
+        np.savetxt(params_file, params)
+    else:
+        params_old = np.loadtxt(params_file)
+        if not(np.allclose(params, params_old)):
+            print('Parameters changed! Check the optimization algorithm.')
+            sys.exit(1)   # terminate immediately with error code
+        else:
+            print('Parameters are the same. Keep going...')
