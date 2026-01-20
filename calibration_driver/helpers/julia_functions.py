@@ -8,7 +8,6 @@ def initialize_eki(observation_vector, gamma_vector, initial_ensemble, scheduler
     Main.eval(f"""
         using EnsembleKalmanProcesses, Random     
         using LinearAlgebra   
-        Random.seed!({seed})   # Fix random numbers globally
     """)
 
     eki_state_file = f'{optimization_folder_pwd}/eki_state.jls'
@@ -20,6 +19,7 @@ def initialize_eki(observation_vector, gamma_vector, initial_ensemble, scheduler
                 """)
     else:
         Main.eval(f"""
+            Random.seed!({seed})   # Fix random numbers globally
             eki = EnsembleKalmanProcess(
             initial_ensemble, observation_vector, Diagonal(gamma_vector), {inversion},
             scheduler = {scheduler},

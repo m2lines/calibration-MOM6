@@ -13,7 +13,9 @@ eki:
   ens_size: 100
   ens_spread: 0.25
   seed: 0
+  seed_julia: 2
   outlier_scale: 1.e+9
+  gamma_scaling_factor: 1.e-5
   inversion: "TransformInversion()"
   scheduler: "DataMisfitController(terminate_at=1e+100)"
   trainable_parameters: ["weights2", "biases2"]
