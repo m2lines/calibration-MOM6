@@ -45,7 +45,8 @@ def assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd,
                                         daymax,
                                         len_obs, ens_size, 
                                         outlier_scale, metrics_function_name,
-                                        observation_vector_names, gamma_vector_names):
+                                        observation_vector_names, gamma_vector_names,
+                                        observation_validation_names, gamma_validation_names):
     '''
     This algorithm includes multiple steps:
     1) Compute raw metrics for an ensemble of experiments
@@ -53,6 +54,9 @@ def assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd,
     3) Compute distance to observations
     4) Remove outliers
     5) Evaluate ensemble-mean prediction
+
+    observation_vector_names, gamma_vector_names are metrics used to compute loss function
+    observation_validation_names, gamma_validation_names are all metrics computed and stored for analysis
     '''
     # Create forward model evaluation matrix
     g_ens = np.full(
@@ -68,7 +72,7 @@ def assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd,
         
         # Compute metrics used for the optimization as a dictionaty
         metrics_function = eval(metrics_function_name) 
-        metrics_data = metrics_function(exp_path, daymax, *observation_vector_names)
+        metrics_data = metrics_function(exp_path, daymax, *observation_validation_names)
         
         # Concatenate metrics to a vector
         if isinstance(metrics_data, dict):
@@ -79,14 +83,14 @@ def assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd,
 
         # Store metrics for a given experiment as netcdf file
         metrics_netcdf = xr.Dataset()
-        for metric in observation_vector_names:
+        for metric in observation_validation_names:
             if isinstance(metrics_data, dict):
                 metrics_netcdf[metric] = observation_netcdf[metric]*0 + metrics_data[metric]
             else:
                 metrics_netcdf[metric] = observation_netcdf[metric]*np.nan
 
         # Compute distance to the observation
-        for metric, metric_var in zip(observation_vector_names, gamma_vector_names):
+        for metric, metric_var in zip(observation_validation_names, gamma_validation_names):
             # Compute error and obs covariance
             error = metrics_netcdf[metric] - observation_netcdf[metric]
             variance = observation_netcdf[metric_var]
@@ -102,6 +106,7 @@ def assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd,
             metrics_netcdf[metric+'_RMSE'] = np.sqrt((error * error).mean(spatial_ave_dims, skipna=False))
         
         # Compute total weighted mean squared error as it is computed by Ensemble Kalman Processes.jl
+        # Here we consider only those metrics which are in the loss function
         metrics_netcdf['WMSE'] = np.sum([metrics_netcdf[metric+'_WSE'] for metric in observation_vector_names]) / len_obs
         
         # Append the experiment to the list
@@ -115,7 +120,7 @@ def assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd,
     min_WMSE = float(metrics_netcdf['WMSE'].min())
     mask_outlier = metrics_netcdf['WMSE'] > min_WMSE * outlier_scale
     g_ens[:,mask_outlier] = np.nan
-    for metric in observation_vector_names:
+    for metric in observation_validation_names:
         metrics_netcdf[metric][mask_outlier] = np.nan
         metrics_netcdf[metric+'_WSE'][mask_outlier] = np.nan
         metrics_netcdf[metric+'_RMSE'][mask_outlier] = np.nan
@@ -123,7 +128,7 @@ def assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd,
     print('Filtered out outliers: ', np.where(mask_outlier)[0])
 
     # Evaluate ensemble-mean prediction
-    for metric, metric_var in zip(observation_vector_names, gamma_vector_names):
+    for metric, metric_var in zip(observation_validation_names, gamma_validation_names):
         error = metrics_netcdf[metric].mean('ens') - observation_netcdf[metric]
         variance = observation_netcdf[metric_var]
         spatial_ave_dims = []

@@ -70,9 +70,9 @@ for iteration in range(args.latest_iteration, config["eki"]["n_iterations"]):
             config["mom6_namelist"]["DAYMAX"], 
             len(observation_vector), config["eki"]["ens_size"],
             config["eki"]["outlier_scale"], config["eki"]["metrics_function"],
-            config["eki"]["observation_vector"], config["eki"]["gamma_vector"]
+            config["eki"]["observation_vector"], config["eki"]["gamma_vector"],
+            config["eki"]["observation_validation"], config["eki"]["gamma_validation"],
             )
-        
         print('Passing forward model evaluations to the EKI')
         eki_update_ensemble(g_ens)
         print('Forward model evaluations are passed to the EKI; Parameters are updated')
