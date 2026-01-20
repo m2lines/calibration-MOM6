@@ -9,7 +9,7 @@ paths:
   configuration: "/home/pp2681/MOM6-examples/build/configurations/double_gyre_long"
 
 eki:
-  n_iterations: 10
+  n_iterations: 3
   ens_size: 100
   ens_spread: 0.25
   seed: 0
@@ -31,7 +31,7 @@ mom6_namelist:
 slurm_eki: "sbatch --time=06:00:00 --cpus-per-task=4 --mem=16GB"
 
 slurm_mom6:
-  time: 1
+  time: 2
 
 #singularity_command: "singularity exec --nv --overlay /scratch/$USER/python-container/python-overlay.ext3:ro --bind /scratch/pp2681/python-container/escnn-cache:/ext3/miniconda3/lib/python3.11/site-packages/escnn/group/_cache/ /share/apps/images/cuda12.3.2-cudnn9.0.0-ubuntu-22.04.4.sif"
 

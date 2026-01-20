@@ -3,7 +3,7 @@ import numpy as np
 
 def return_climate_metrics(exp_path, daymax, *metrics):
     try:
-        prog = xr.open_mfdataset(f'{exp_path}/prog_*.nc', decode_times=False).astype('float64').sortby('Time').sel(Time=slice(365*10,None)).isel(zi=slice(0,2))
+        prog = xr.open_mfdataset(f'{exp_path}/prog_*.nc', decode_times=False).astype('float64').sortby('Time').sel(Time=slice(365*10,None)).isel(zi=slice(0,2)).fillna(0.)
         series = 1e-15 * xr.open_mfdataset(f'{exp_path}/ocean.stats.nc', decode_times=False).astype('float64').sel(Time=slice(365*10,None)).isel(Interface=slice(0,2)).rename({'Layer': 'zl', 'Interface': 'zi'})[['KE', 'APE']]
     except:
         return False

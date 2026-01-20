@@ -10,6 +10,9 @@ from helpers.metrics_DG import *
 import argparse
 import yaml
 
+########################## USAGE ################################
+# python-jl /home/pp2681/calibration/calibration_driver/driver.py
+
 with open("config.yaml", "r") as file:
     config = yaml.safe_load(file)
 
@@ -81,7 +84,7 @@ for iteration in range(args.latest_iteration, config["eki"]["n_iterations"]):
                     metrics_netcdf[metric] = observation_netcdf[metric]*0 + metrics_data[metric]
                 else:
                     metrics_netcdf[metric] = observation_netcdf[metric]*np.nan
-                
+
             # Compute Weighted Squared Errors
             for metric, metric_var in zip(config["eki"]["observation_vector"], config["eki"]["gamma_vector"]):
                 error = metrics_netcdf[metric] - observation_netcdf[metric]
@@ -94,13 +97,6 @@ for iteration in range(args.latest_iteration, config["eki"]["n_iterations"]):
                 metrics_netcdf[metric+'_RMSE'] = np.sqrt((error * error).mean(spatial_ave_dims, skipna=False))
             metrics_netcdf['WMSE'] = np.sum([metrics_netcdf[metric+'_WSE'] for metric in config["eki"]["observation_vector"]]) / len(observation_vector)
             metrics_netcdf_list.append(metrics_netcdf)
-        
-        print('Passing forward model evaluations to the EKI')
-        eki_update_ensemble(g_ens)
-        print('Forward model evaluations are passed to the EKI. Going to the next iterations...')
-
-        print('Saving EKI to disk')
-        save_eki_on_disk(optimization_folder_pwd)
 
         print('Saving metrics to disk')
         metrics_netcdf = xr.concat(metrics_netcdf_list, dim='ens')
@@ -117,7 +113,15 @@ for iteration in range(args.latest_iteration, config["eki"]["n_iterations"]):
             metrics_netcdf[metric+'_WSE_MAP'] = (error * error / variance).sum(spatial_ave_dims)
             metrics_netcdf[metric+'_RMSE_MAP'] = np.sqrt((error * error).mean(spatial_ave_dims, skipna=False))
         metrics_netcdf['WMSE_MAP'] = np.sum([metrics_netcdf[metric+'_WSE_MAP'] for metric in config["eki"]["observation_vector"]]) / len(observation_vector)
-        metrics_netcdf.to_netcdf(f'{optimization_folder_pwd}/metrics_{iteration}.nc')
+        metrics_netcdf.to_netcdf(f'{optimization_folder_pwd}/metrics_{iteration:02d}.nc')
+
+        print('Passing forward model evaluations to the EKI')
+        eki_update_ensemble(g_ens)
+        print('Forward model evaluations are passed to the EKI. Going to the next iterations...')
+
+        print('Saving EKI to disk')
+        save_eki_on_disk(optimization_folder_pwd)
+
     else:
         print('Run experiments in folder ', iteration_path)
         for ens_member in range(config["eki"]["ens_size"]):
