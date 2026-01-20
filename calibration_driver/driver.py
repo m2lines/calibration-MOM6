@@ -53,8 +53,20 @@ initialize_eki(observation_vector, gamma_vector, initial_ensemble, config["eki"]
 for iteration in range(args.latest_iteration, config["eki"]["n_iterations"]):
     print(f'################ iteration {iteration} ####################')
     params = eki_get_params()
-
     iteration_path = f'{optimization_folder_pwd}/iteration-{iteration:02d}'
+
+    params_file = f'{iteration_path}-params.txt'
+
+    if not(os.path.exists(params_file)):
+        print('Saving parameters to file', params_file)
+        np.savetxt(params_file, params)
+    else:
+        params_old = np.loadtxt(params_file)
+        if not(np.allclose(params, params_old)):
+            print('Parameters changed! Check the optimization algorithm.')
+            sys.exit(1)   # terminate immediately with error code
+        else:
+            print('Parameters are the same. Keep going...')
     
     if os.path.exists(iteration_path):
         print('Folder with experiments exists. Preparing to update eki with new data')
@@ -101,6 +113,17 @@ for iteration in range(args.latest_iteration, config["eki"]["n_iterations"]):
         print('Saving metrics to disk')
         metrics_netcdf = xr.concat(metrics_netcdf_list, dim='ens')
         metrics_netcdf['param'] = xr.DataArray(params, dims=['pdim', 'ens']).transpose('ens',...)
+
+        # Find outliers
+        min_WMSE = float(metrics_netcdf['WMSE'].min())
+        mask_outlier = metrics_netcdf['WMSE'] > min_WMSE * config["eki"]["outlier_scale"]
+        g_ens[:,mask_outlier] = np.nan
+        for metric in config["eki"]["observation_vector"]:
+            metrics_netcdf[metric][mask_outlier] = np.nan
+            metrics_netcdf[metric+'_WSE'][mask_outlier] = np.nan
+            metrics_netcdf[metric+'_RMSE'][mask_outlier] = np.nan
+        metrics_netcdf['WMSE'][mask_outlier] = np.nan
+        print('Filtered out outliers: ', np.where(mask_outlier)[0])
 
         # Compute Weighted Squared Errors
         for metric, metric_var in zip(config["eki"]["observation_vector"], config["eki"]["gamma_vector"]):

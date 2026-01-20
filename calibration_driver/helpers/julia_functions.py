@@ -13,6 +13,7 @@ def initialize_eki(observation_vector, gamma_vector, initial_ensemble, scheduler
 
     eki_state_file = f'{optimization_folder_pwd}/eki_state.jls'
     if os.path.exists(eki_state_file):
+        Main.eki_state_file = eki_state_file
         Main.eval("""
                 using Serialization
                 eki = deserialize(eki_state_file)
