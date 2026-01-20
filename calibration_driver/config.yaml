@@ -33,7 +33,7 @@ mom6_namelist:
   USE_CIRCULATION_IN_HORVISC: "True"
   ZB_SCALING: 1.0
 
-slurm_eki: "sbatch --time=06:00:00 --cpus-per-task=4 --mem=16GB"
+slurm_eki: "sbatch --time=02:00:00 --cpus-per-task=4 --mem=16GB"
 
 slurm_mom6:
   time: 2
