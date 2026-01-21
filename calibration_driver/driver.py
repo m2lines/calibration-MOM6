@@ -14,6 +14,8 @@ import yaml
 # To start calibration: python-jl /home/pp2681/calibration/calibration_driver/driver.py
 # To continue calibration: python-jl /home/pp2681/calibration/calibration_driver/driver.py --latest_iteration=1
 # Where latest_iteration is the last folder of experiments which was computed but not yet processed
+# Best practice is to start calibration in the folder where we expect to see experiments with config.yaml and run
+# sbatch --time=02:00:00 --cpus-per-task=4 --mem=16GB --wrap='python-jl /home/pp2681/calibration/calibration_driver/driver.py'
 
 ######################## YAML config ###################
 with open("config.yaml", "r") as file:
