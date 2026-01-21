@@ -7,6 +7,8 @@ paths:
   observation: "/home/pp2681/calibration/scripts/R32/R2_FGR3_series_loss.nc"
   executable: "/scratch/pp2681/MOM6-examples/build/compiled_executables/MOM6-dev-m2lines-Aug18"
   configuration: "/home/pp2681/MOM6-examples/build/configurations/double_gyre_long"
+  prior_cov: None
+  #prior_cov: "/home/pp2681/calibration/scripts/priors/weights2_biases2_Cxx_prior_cond_100.npy"
 
 eki:
   n_iterations: 3

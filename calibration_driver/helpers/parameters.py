@@ -1,30 +1,54 @@
 import numpy as np
 import os
+import sys
 
-def generate_ensemble(ANN_netcdf, parameter_list, ensemble_spread, ensemble_size):
+def generate_ensemble(ANN_netcdf, parameter_list, ensemble_spread, ensemble_size, prior_cov_path):
     '''
     Receives neural network netcdf object, parameter_list to perturb,
     ensemble spread and ensemble size, and returns: 
     * numpy array of size num_of_parameters.sum() x ensemble_size
     * number of parameters of the same kind as a list num_of_parameters
     '''
-    initial_ensemble = []
     num_of_parameters = []
-    for parameter_key in parameter_list:
-        parameter_vector = ANN_netcdf[parameter_key].values
-        n_param = len(parameter_vector)
-        if n_param > 5:
-            parameter_scale = float(parameter_vector.std())
-        else:
-            parameter_scale = float(np.abs(parameter_vector).mean())
 
-        random_perturbation = ensemble_spread * parameter_scale * np.random.randn(n_param, ensemble_size)
+    if not(os.path.exists(prior_cov_path)):
+        print('Creating diagonal prior covariance matrix')
+        initial_ensemble = []
+        for parameter_key in parameter_list:
+            parameter_vector = ANN_netcdf[parameter_key].values
+            n_param = len(parameter_vector)
 
-        ensemble = parameter_vector.reshape(-1,1) + random_perturbation
-        initial_ensemble.append(ensemble)
-        num_of_parameters.append(n_param)
+            if n_param > 5:
+                parameter_scale = float(parameter_vector.std())
+            else:
+                parameter_scale = float(np.abs(parameter_vector).mean())
 
-    return np.concatenate(initial_ensemble), num_of_parameters
+            random_perturbation = ensemble_spread * parameter_scale * np.random.randn(n_param, ensemble_size)
+
+            ensemble = parameter_vector.reshape(-1,1) + random_perturbation
+            initial_ensemble.append(ensemble)
+            num_of_parameters.append(n_param)
+        
+        initial_ensemble = np.concatenate(initial_ensemble)
+    else:
+        print('Reading prior covariance matrix from the disk')
+        C_xx_prior = np.load(prior_cov_path)
+        random_perturbation = ensemble_spread * \
+            np.random.multivariate_normal(
+                mean=np.zeros(C_xx_prior.shape[0]),
+                cov=C_xx_prior,
+                size=ensemble_size
+            ).T
+
+        parameter_vector = []
+        for parameter_key in parameter_list:
+            x = ANN_netcdf[parameter_key].values
+            num_of_parameters.append(len(x))
+            parameter_vector.append(x)
+        parameter_vector = np.concatenate(parameter_vector)
+        initial_ensemble = parameter_vector.reshape(-1,1) + random_perturbation
+
+    return initial_ensemble, num_of_parameters
 
 def parameter_vector_to_ANN(ANN_netcdf, parameter_list, num_of_parameters, parameter_vector):
     '''

@@ -12,14 +12,14 @@ import argparse
 
 ## Global paths
 TAG = 'OT'
-base_path = '/scratch/pp2681/mom6/CM26_Double_Gyre/calibration/online_training'
-optimization_folder = 'R2_FGR3_nudging_10day'
+base_path = '/scratch/pp2681/mom6/CM26_Double_Gyre/calibration/1_day_response'
+optimization_folder = 'last_layer_eANN'
 ANN_default_path = '/scratch/pp2681/mom6/CM26_ML_models/ocean3d/subfilter/FGR3/equivariant/learning_rate/N8-forcing-fluxes/0.05/model/'
 this_file = os.path.abspath(__file__)  # full path of current script
 script_name = os.path.basename(this_file)  # just the filename
 commandline = f'cd /home/pp2681/calibration/scripts; sbatch --time=04:00:00 --mem=16GB --dependency=singleton --export=NONE --job-name={TAG} -o {base_path}/{optimization_folder}/slurm-%j.out -e {base_path}/{optimization_folder}/slurm-%j.err --wrap="python-jl {script_name}"'
 # Here, we attenuate the spread of the initial ensemble as if not doing so, experiments explode
-ENS_SPREAD = 0.25
+ENS_SPREAD = 1.0
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -33,15 +33,15 @@ if args.echo:
     sys.exit(0)
 
 # Model configuration
-exp_params = PARAMETERS.add(DAYMAX=360.0).add(USE_ZB2020='True',ZB2020_USE_ANN='True',ZB2020_ANN_FILE_TALL='INPUT/Tall.nc',USE_CIRCULATION_IN_HORVISC='True', THICKNESSDIFFUSE='True', KHTH=0., DO_THICKNESS_NUDGING='True', THICKNESS_NUDGING_TIMESCALE = 8.64E+05)
+exp_params = PARAMETERS.add(DAYMAX=1.0).add(USE_ZB2020='True',ZB2020_USE_ANN='True',ZB2020_ANN_FILE_TALL='INPUT/Tall.nc',USE_CIRCULATION_IN_HORVISC='True')
 # Read necessary NETCDF files
 ANN_netcdf_default = xr.open_dataset(f'{ANN_default_path}/eANN.nc').load()
 # Read observation vector
-observation = xr.open_dataset('/home/pp2681/calibration/scripts/R32/R2_FGR3_online_training.nc')
+observation = xr.open_dataset('/home/pp2681/calibration/scripts/R32/R2_FGR3_online_training.nc').isel(Time=slice(0,1))
 
 # EKI configuration
 N_iterations = 1
-N_ensemble = 100
+N_ensemble = 1000
 
 np.random.seed(0)
 # Initial ensemble for EKI
@@ -111,7 +111,7 @@ Main.eval("""
 os.makedirs(f'{base_path}/{optimization_folder}', exist_ok=True)
 
 metrics = xr.Dataset()
-Ntime = 20
+Ntime = 1
 Nres = 1
 nzl = 2
 ny = 40
@@ -205,11 +205,11 @@ for iteration in range(N_iterations):
                 further_command = f'cp /scratch/pp2681/mom6/Feb2022/filtered/R32_R2_FGR3/RESTART_non_TWA/MOM_0.res.nc {experiment_folder}/INPUT/MOM.res.nc'
 
                 if RR == 'R2':
-                    hpc = HPC.add(name=TAG, time=1, mem=2, begin='1minute', executable='/scratch/pp2681/MOM6-examples/build/compiled_executables/MOM6-dev-m2lines-Jun18-nudging ')
+                    hpc = HPC.add(name=TAG, time=1, mem=2, begin='1minute', executable='/scratch/pp2681/MOM6-examples/build/compiled_executables/MOM6-dev-m2lines-Jun18 ')
                 if RR == 'R4':
-                    hpc = HPC.add(name=TAG, time=12, ntasks=4, mem=2, begin='1minute', executable='/scratch/pp2681/MOM6-examples/build/compiled_executables/MOM6-dev-m2lines-Jun18-nudging ')
+                    hpc = HPC.add(name=TAG, time=12, ntasks=4, mem=2, begin='1minute', executable='/scratch/pp2681/MOM6-examples/build/compiled_executables/MOM6-dev-m2lines-Jun18 ')
                 if RR == 'R8':
-                    hpc = HPC.add(name=TAG, time=48, ntasks=16, mem=4, begin='1minute', executable='/scratch/pp2681/MOM6-examples/build/compiled_executables/MOM6-dev-m2lines-Jun18-nudging ')
+                    hpc = HPC.add(name=TAG, time=48, ntasks=16, mem=4, begin='1minute', executable='/scratch/pp2681/MOM6-examples/build/compiled_executables/MOM6-dev-m2lines-Jun18 ')
                 
                 run_experiment(experiment_folder, hpc, exp_params.add(**configuration(RR)), '/home/pp2681/MOM6-examples/build/configurations/double_gyre', call_function, further_command)
                 # We save data after initializing experiment to do not interrupt workflow.

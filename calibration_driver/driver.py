@@ -38,7 +38,8 @@ np.random.seed(config["eki"]["seed"])
 initial_ensemble, num_of_parameters = generate_ensemble(ANN_netcdf_default, 
                                         config["eki"]["trainable_parameters"],
                                         config["eki"]["ens_spread"],
-                                        config["eki"]["ens_size"])
+                                        config["eki"]["ens_size"],
+                                        config["paths"]["prior_cov"])
 
 ############ Prepare observational vector ##############
 observation_netcdf = xr.open_dataset(config["paths"]["observation"]).astype('float64')
@@ -113,7 +114,7 @@ for iteration in range(args.latest_iteration, config["eki"]["n_iterations"]):
         print('Experiments are scheduled')
         print('Putting in a queue resubmission script')
         this_file = os.path.abspath(__file__)  # full path of current script
-        commandline = f'cd {optimization_folder_pwd}; {config["slurm_eki"]} --dependency=singleton --export=NONE --job-name={config["tag"]} -o {optimization_folder_pwd}/slurm-%j.out -e {optimization_folder_pwd}/slurm-%j.err --wrap="python-jl {this_file} --latest_iteration={iteration}"'
+        commandline = f'cd {os.getcwd()}; {config["slurm_eki"]} --dependency=singleton --export=NONE --job-name={config["tag"]} -o {optimization_folder_pwd}/slurm-%j.out -e {optimization_folder_pwd}/slurm-%j.err --wrap="python-jl {this_file} --latest_iteration={iteration}"'
         print('Resubmission commandline:')
         print(commandline)
         os.system(commandline)
