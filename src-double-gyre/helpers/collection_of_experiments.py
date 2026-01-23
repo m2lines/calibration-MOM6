@@ -451,9 +451,9 @@ class CollectionOfExperiments:
             plt.subplot(nrows,ncol,ifig+1)
             EKE = remesh(self[exp].EKE, self[target].EKE)
             if zl==0:
-                levels = np.linspace(0,2.5e-2,11)
+                levels = np.linspace(0,1e-2,11)
             else:
-                levels = np.linspace(0,1.2e-2,13)
+                levels = np.linspace(0,5e-3,13)
             label = 'EKE, $m^{2}s^{-2}$'
 
             EKE.isel(zl=zl).plot.contourf(levels=levels, cmap=cmocean.cm.balance, linewidths=1, cbar_kwargs={'label': label})
