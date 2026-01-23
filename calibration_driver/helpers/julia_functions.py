@@ -1,18 +1,20 @@
 from julia import Main
 import os
 import numpy as np
-def initialize_eki(observation_vector, gamma_vector, initial_ensemble, scheduler, inversion, seed, optimization_folder_pwd):
-    # Change target with the scalar product information rather than provide
-    # scalar product as an input to the EKI
-    Main.observation_vector = observation_vector / np.sqrt(gamma_vector)
-    Main.gamma_vector = np.ones_like(observation_vector)
-    Main.initial_ensemble = initial_ensemble
+import xarray as xr
+from helpers.parameters import *
+
+def initialize_eki(ANN_netcdf_default, observation_netcdf, config, optimization_folder_pwd):
 
     Main.eval(f"""
         using EnsembleKalmanProcesses, Random     
         using LinearAlgebra
-        Random.seed!({seed})   # Fix random numbers globally
+        Random.seed!({config["eki"]["seed_julia"]})   # Fix random numbers globally
     """)
+
+    # Length of the observational vector
+    len_obs = np.sum([observation_netcdf[metric].size for metric in config["eki"]["observation_vector"]])
+    print("Length of the observational vector", len_obs)
 
     eki_state_file = f'{optimization_folder_pwd}/eki_state.jls'
     rng_state_file = f'{optimization_folder_pwd}/rng.jls'
@@ -27,14 +29,95 @@ def initialize_eki(observation_vector, gamma_vector, initial_ensemble, scheduler
                 """)
     else:
         print('Initializing EKI from scratch')
+        ############### Create initial ensemble ################
+        np.random.seed(config["eki"]["seed"])
+        initial_ensemble, num_of_parameters = generate_ensemble(ANN_netcdf_default, 
+                                                config["eki"]["trainable_parameters"],
+                                                config["eki"]["ens_spread"],
+                                                config["eki"]["ens_size"],
+                                                config["paths"]["prior_cov"])
+                                                
+        ############ Prepare observational vector ##############
+        observation_vector = []
+        for key in config["eki"]["observation_vector"]:
+            observation_vector.append(observation_netcdf[key].values.ravel())
+        observation_vector = np.concatenate(observation_vector)
+
+        ################ Prepare scalar product ################
+        gamma_vector = []
+        for key in config["eki"]["gamma_vector"]:
+            gamma_vector.append(observation_netcdf[key].values.ravel())
+        gamma_vector = np.concatenate(gamma_vector)
+
+        # Construct the observational vector in rescaled space using
+        # the defined scalar product
+        Main.observation_vector = observation_vector / np.sqrt(gamma_vector)
+        Main.initial_ensemble = initial_ensemble
+
+        ############### Create noise model #####################
+        if os.path.exists(config["paths"]["noise_model"]):
+            print("Reading noise model from file")
+            noise_model = xr.open_dataset(config["paths"]["noise_model"]).isel(iter=0).load()
+            ens_size = config["eki"]["ens_size"]
+
+            # Create forward model evaluation matrix
+            noise_ens = np.full(
+                (len_obs, ens_size),
+                np.nan,
+                dtype="float64"
+            )
+
+            for ens_member in range(ens_size):
+                noise_ens[:,ens_member] = np.concatenate([
+                    noise_model[metric].isel(ens=ens_member).values.ravel() / np.sqrt(observation_netcdf[gamma].values.ravel()) 
+                    for metric, gamma in zip(config["eki"]["observation_vector"], config["eki"]["gamma_vector"])])
+
+            # Remove mean to make sure that we analyze fluctuations
+            noise_ens = noise_ens - noise_ens.mean(1,keepdims=True)
+
+            trace_noise_model = (noise_ens**2).sum(0).mean()
+            noise_trace_ratio = config["eki"]["noise_trace_ratio"]
+            print('Trace of the noise model before covariance inflation:', trace_noise_model)
+            print('Trace of the noise model after covariance inflation:', trace_noise_model * (1. + noise_trace_ratio))
+            # Desired regularization parameter is found by equality of traces
+            # On the right is the trace of identity operator with scaling coefficient alpha
+            # trace_noise_model * noise_trace_ratio = alpha * len_obs
+            alpha = trace_noise_model * noise_trace_ratio / len_obs
+            print("Alpha variance inflation parameter", alpha)
+
+            Main.noise_ens = noise_ens
+            Main.alpha = alpha
+            Main.ones_vector = np.ones_like(observation_vector)
+
+            # Here we compute the covariance matrix using SVD
+            # with help of standard EnsembleKalmanProcesses.jl workflow
+            # We also make sure to add the identity variance inflation with the
+            # given trace
+            Main.eval("""
+            internal_cov = tsvd_cov_from_samples(noise_ens)
+            background_noise = ones_vector * alpha
+            covariance = SVDplusD(internal_cov, Diagonal(background_noise));
+            """)
+            print('Computation of noise covariance matrix in SVD form is finished')
+        else:
+            Main.covariance = np.ones_like(observation_vector)
+            Main.eval("covariance = Diagonal(covariance)")
+
         Main.eval(f"""
+            observation = Observation(Dict(
+            "samples" => observation_vector,
+            "covariances" => covariance,
+            "names" => "why_are_you_asking_my_name"
+            ))  
             eki = EnsembleKalmanProcess(
-            initial_ensemble, observation_vector, Diagonal(gamma_vector), {inversion},
-            scheduler = {scheduler},
+            initial_ensemble, observation, {config["eki"]["inversion"]},
+            scheduler = {config["eki"]["scheduler"]},
             accelerator = DefaultAccelerator(),
             localization_method = EnsembleKalmanProcesses.Localizers.NoLocalization(),
             verbose=true)
             """)
+    
+    return len_obs, num_of_parameters
     
 def save_eki_on_disk(optimization_folder_pwd):
     eki_state_file = f'{optimization_folder_pwd}/eki_state.jls'

@@ -41,10 +41,8 @@ def return_climate_metrics(exp_path, daymax, *metrics):
     return metrics_data
 
 def assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd, iteration,
-                                        gamma_vector,
                                         observation_netcdf, params,
-                                        daymax,
-                                        len_obs, ens_size, 
+                                        daymax, len_obs, ens_size, 
                                         outlier_scale, metrics_function_name,
                                         observation_vector_names, gamma_vector_names,
                                         observation_validation_names, gamma_validation_names):
@@ -77,7 +75,7 @@ def assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd,
         
         # Concatenate metrics to a vector
         if isinstance(metrics_data, dict):
-            g_ens[:,ens_member] = np.concatenate([metrics_data[metric].ravel() for metric in observation_vector_names]) / np.sqrt(gamma_vector)
+            g_ens[:,ens_member] = np.concatenate([metrics_data[metric].ravel() / np.sqrt(observation_netcdf[gamma].values.ravel()) for metric, gamma in zip(observation_vector_names, gamma_vector_names)])
             print(f'Ensemble member {ens_member} succesfully ingested')
         else:
             print(f'Ensemble member {ens_member} failed. Filled with NaNs')

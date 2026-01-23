@@ -32,30 +32,12 @@ print(config)
 optimization_folder_pwd = os.path.join(config["paths"]["base"], config["paths"]["optimization_folder"])
 os.makedirs(f'{optimization_folder_pwd}', exist_ok=True)
 
-############### Create initial ensemble ################
+################### Open netcdf files ###################
 ANN_netcdf_default = xr.open_dataset(f'{config["paths"]["ann"]}/eANN.nc').load()
-np.random.seed(config["eki"]["seed"])
-initial_ensemble, num_of_parameters = generate_ensemble(ANN_netcdf_default, 
-                                        config["eki"]["trainable_parameters"],
-                                        config["eki"]["ens_spread"],
-                                        config["eki"]["ens_size"],
-                                        config["paths"]["prior_cov"])
-
-############ Prepare observational vector ##############
 observation_netcdf = xr.open_dataset(config["paths"]["observation"]).astype('float64')
-observation_vector = []
-for key in config["eki"]["observation_vector"]:
-    observation_vector.append(observation_netcdf[key].values.ravel())
-observation_vector = np.concatenate(observation_vector)
-
-############ Prepare gamma vector ##############
-gamma_vector = []
-for key in config["eki"]["gamma_vector"]:
-    gamma_vector.append(observation_netcdf[key].values.ravel())
-gamma_vector = np.concatenate(gamma_vector)
 
 ############ Initialize EKI process #############
-initialize_eki(observation_vector, gamma_vector, initial_ensemble, config["eki"]["scheduler"], config["eki"]["inversion"], config["eki"]["seed_julia"], optimization_folder_pwd)
+len_obs, num_of_parameters = initialize_eki(ANN_netcdf_default, observation_netcdf, config, optimization_folder_pwd)
 
 for iteration in range(args.latest_iteration, config["eki"]["n_iterations"]):
     print(f'################ iteration {iteration} ####################')
@@ -69,10 +51,9 @@ for iteration in range(args.latest_iteration, config["eki"]["n_iterations"]):
 
         print('Processing Forward model outputs...')
         g_ens = assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd, iteration,
-            gamma_vector,
             observation_netcdf, params,
             config["mom6_namelist"]["DAYMAX"], 
-            len(observation_vector), config["eki"]["ens_size"],
+            len_obs, config["eki"]["ens_size"],
             config["eki"]["outlier_scale"], config["eki"]["metrics_function"],
             config["eki"]["observation_vector"], config["eki"]["gamma_vector"],
             config["eki"]["observation_validation"], config["eki"]["gamma_validation"],
