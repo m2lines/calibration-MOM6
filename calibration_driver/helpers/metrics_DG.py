@@ -41,6 +41,7 @@ def return_climate_metrics(exp_path, daymax, *metrics):
     return metrics_data
 
 def assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd, iteration,
+                                        gamma_vector,
                                         observation_netcdf, params,
                                         daymax,
                                         len_obs, ens_size, 
@@ -76,7 +77,7 @@ def assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd,
         
         # Concatenate metrics to a vector
         if isinstance(metrics_data, dict):
-            g_ens[:,ens_member] = np.concatenate([metrics_data[metric].ravel() for metric in observation_vector_names])
+            g_ens[:,ens_member] = np.concatenate([metrics_data[metric].ravel() for metric in observation_vector_names]) / np.sqrt(gamma_vector)
             print(f'Ensemble member {ens_member} succesfully ingested')
         else:
             print(f'Ensemble member {ens_member} failed. Filled with NaNs')
@@ -108,6 +109,7 @@ def assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd,
         # Compute total weighted mean squared error as it is computed by Ensemble Kalman Processes.jl
         # Here we consider only those metrics which are in the loss function
         metrics_netcdf['WMSE'] = np.sum([metrics_netcdf[metric+'_WSE'] for metric in observation_vector_names]) / len_obs
+        metrics_netcdf['WSE'] = metrics_netcdf['WMSE'] * len_obs
         
         # Append the experiment to the list
         metrics_netcdf_list.append(metrics_netcdf)
@@ -138,6 +140,7 @@ def assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd,
         metrics_netcdf[metric+'_WSE_MAP'] = (error * error / variance).sum(spatial_ave_dims)
         metrics_netcdf[metric+'_RMSE_MAP'] = np.sqrt((error * error).mean(spatial_ave_dims, skipna=False))
     metrics_netcdf['WMSE_MAP'] = np.sum([metrics_netcdf[metric+'_WSE_MAP'] for metric in observation_vector_names]) / len_obs
+    metrics_netcdf['WSE_MAP'] = metrics_netcdf['WMSE_MAP'] * len_obs
     
     # Expand dimenion for iteration
     metrics_netcdf = metrics_netcdf.expand_dims(iter=[iteration]).transpose('iter', 'ens',...)

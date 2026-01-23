@@ -1,8 +1,11 @@
 from julia import Main
 import os
+import numpy as np
 def initialize_eki(observation_vector, gamma_vector, initial_ensemble, scheduler, inversion, seed, optimization_folder_pwd):
-    Main.observation_vector = observation_vector
-    Main.gamma_vector = gamma_vector
+    # Change target with the scalar product information rather than provide
+    # scalar product as an input to the EKI
+    Main.observation_vector = observation_vector / np.sqrt(gamma_vector)
+    Main.gamma_vector = np.ones_like(observation_vector)
     Main.initial_ensemble = initial_ensemble
 
     Main.eval(f"""

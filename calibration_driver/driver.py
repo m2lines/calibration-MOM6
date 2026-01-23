@@ -52,7 +52,7 @@ observation_vector = np.concatenate(observation_vector)
 gamma_vector = []
 for key in config["eki"]["gamma_vector"]:
     gamma_vector.append(observation_netcdf[key].values.ravel())
-gamma_vector = config["eki"]["gamma_scaling_factor"] * np.concatenate(gamma_vector)
+gamma_vector = np.concatenate(gamma_vector)
 
 ############ Initialize EKI process #############
 initialize_eki(observation_vector, gamma_vector, initial_ensemble, config["eki"]["scheduler"], config["eki"]["inversion"], config["eki"]["seed_julia"], optimization_folder_pwd)
@@ -69,6 +69,7 @@ for iteration in range(args.latest_iteration, config["eki"]["n_iterations"]):
 
         print('Processing Forward model outputs...')
         g_ens = assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd, iteration,
+            gamma_vector,
             observation_netcdf, params,
             config["mom6_namelist"]["DAYMAX"], 
             len(observation_vector), config["eki"]["ens_size"],
