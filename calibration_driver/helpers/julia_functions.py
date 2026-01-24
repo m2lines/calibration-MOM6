@@ -12,6 +12,14 @@ def initialize_eki(ANN_netcdf_default, observation_netcdf, config, optimization_
         Random.seed!({config["eki"]["seed_julia"]})   # Fix random numbers globally
     """)
 
+    ############### Create initial ensemble ################
+    np.random.seed(config["eki"]["seed"])
+    initial_ensemble, num_of_parameters = generate_ensemble(ANN_netcdf_default, 
+                                            config["eki"]["trainable_parameters"],
+                                            config["eki"]["ens_spread"],
+                                            config["eki"]["ens_size"],
+                                            config["paths"]["prior_cov"])
+
     # Length of the observational vector
     len_obs = np.sum([observation_netcdf[metric].size for metric in config["eki"]["observation_vector"]])
     print("Length of the observational vector", len_obs)
@@ -28,15 +36,7 @@ def initialize_eki(ANN_netcdf_default, observation_netcdf, config, optimization_
                 copy!(Random.default_rng(), deserialize(rng_state_file))
                 """)
     else:
-        print('Initializing EKI from scratch')
-        ############### Create initial ensemble ################
-        np.random.seed(config["eki"]["seed"])
-        initial_ensemble, num_of_parameters = generate_ensemble(ANN_netcdf_default, 
-                                                config["eki"]["trainable_parameters"],
-                                                config["eki"]["ens_spread"],
-                                                config["eki"]["ens_size"],
-                                                config["paths"]["prior_cov"])
-                                                
+        print('Initializing EKI from scratch')                                        
         ############ Prepare observational vector ##############
         observation_vector = []
         for key in config["eki"]["observation_vector"]:
