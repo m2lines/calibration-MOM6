@@ -152,4 +152,4 @@ def eki_get_params():
 
 def eki_update_ensemble(g_ens):
     Main.g_ens = g_ens
-    Main.eval("update_ensemble!(eki, g_ens)")
+    return Main.eval("update_ensemble!(eki, g_ens)")

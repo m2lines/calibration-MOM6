@@ -59,8 +59,12 @@ for iteration in range(args.latest_iteration, config["eki"]["n_iterations"]):
             config["eki"]["observation_validation"], config["eki"]["gamma_validation"],
             )
         print('Passing forward model evaluations to the EKI')
-        eki_update_ensemble(g_ens)
+        eki_flag = eki_update_ensemble(g_ens)
         print('Forward model evaluations are passed to the EKI; Parameters are updated')
+
+        if eki_flag:
+            print("Update ensemble returns True -> stop iterations")
+            sys.exit(0)
 
         print('Saving EKI to disk')
         save_eki_on_disk(optimization_folder_pwd)
