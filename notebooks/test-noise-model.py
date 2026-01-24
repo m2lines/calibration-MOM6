@@ -2,7 +2,7 @@ from julia import Main
 
 import numpy as np
 
-noise_ens = np.random.randn(3,2)
+noise_ens = np.random.randn(1000, 100)
 ens_size = noise_ens.shape[1]
 
 noise_ens = noise_ens - noise_ens.mean(1,keepdims=True)
@@ -27,19 +27,22 @@ Main.eval("""
     internal_cov_numpy = SVD(U, eigvals, U')
 """)
 
-Main.eval("""
-println("=== Original ===")
-println(internal_cov.U)
-println(internal_cov.S)
-println(internal_cov.Vt)
-""")
+true_cov = noise_ens @ noise_ens.T / (ens_size-1)
+Main.true_cov = true_cov
 
-Main.eval("""
-println("=== numpy ===")
-println(internal_cov_numpy.U)
-println(internal_cov_numpy.S)
-println(internal_cov_numpy.Vt)
-""")
+# Main.eval("""
+# println("=== Original ===")
+# println(internal_cov.U)
+# println(internal_cov.S)
+# println(internal_cov.Vt)
+# """)
+
+# Main.eval("""
+# println("=== numpy ===")
+# println(internal_cov_numpy.U)
+# println(internal_cov_numpy.S)
+# println(internal_cov_numpy.Vt)
+# """)
 
 Main.eval("""
 C1 = Matrix(internal_cov)
@@ -48,6 +51,9 @@ C2 = Matrix(internal_cov_numpy)
 println("=== Matrix difference diagnostics ===")
 println("frobenius norm of diff: ", norm(C1 - C2))
 println("max abs entry: ", maximum(abs.(C1 - C2)))
+
+println("frobenius norm of diff C1 - true: ", norm(C1 - true_cov))
+println("frobenius norm of diff C2 - true: ", norm(C2 - true_cov))
 """)
 
 Main.eval("""
