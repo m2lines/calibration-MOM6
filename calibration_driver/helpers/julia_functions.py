@@ -58,7 +58,7 @@ def initialize_eki(ANN_netcdf_default, observation_netcdf, config, optimization_
         if os.path.exists(config["paths"]["noise_model"]):
             print("Reading noise model from file")
             noise_model = xr.open_dataset(config["paths"]["noise_model"]).isel(iter=0).load()
-            ens_size = config["eki"]["ens_size"]
+            ens_size = len(noise_model.ens)
 
             # Create forward model evaluation matrix
             noise_ens = np.full(
@@ -93,11 +93,25 @@ def initialize_eki(ANN_netcdf_default, observation_netcdf, config, optimization_
             # with help of standard EnsembleKalmanProcesses.jl workflow
             # We also make sure to add the identity variance inflation with the
             # given trace
+            # Main.eval("""
+            # internal_cov = tsvd_cov_from_samples(noise_ens)
+            # background_noise = ones_vector * alpha
+            # covariance = SVDplusD(internal_cov, Diagonal(background_noise));
+            # """)
+            # We compute SVD using numpy as it is 10000 times faster
+            U, s, Vt = np.linalg.svd(noise_ens, full_matrices=False)
+
+            # We reduce the number of degrees of freedom by one as it is done in 
+            # EnsembleKalmanProcesses.jl
+            eigvals = s**2 / (ens_size-1)
+            Main.U = U[:,:-1]
+            Main.eigvals = eigvals[:-1]
             Main.eval("""
-            internal_cov = tsvd_cov_from_samples(noise_ens)
+            internal_cov = SVD(U, eigvals, U')
             background_noise = ones_vector * alpha
             covariance = SVDplusD(internal_cov, Diagonal(background_noise));
             """)
+
             print('Computation of noise covariance matrix in SVD form is finished')
         else:
             Main.covariance = np.ones_like(observation_vector)
