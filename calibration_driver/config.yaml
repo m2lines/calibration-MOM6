@@ -13,7 +13,7 @@ paths:
   #prior_cov: "/home/pp2681/calibration/scripts/priors/weights2_biases2_Cxx_prior_cond_100.npy"
 
 eki:
-  n_iterations: 3
+  n_iterations: 5
   ens_size: 100
   ens_spread: 0.25
   seed: 0
@@ -21,8 +21,13 @@ eki:
   outlier_scale: 1.e+9
   noise_trace_ratio: 1.
   inversion: "TransformInversion()"
-  scheduler: "DataMisfitController(terminate_at=1e+100)"
+  scheduler: "DataMisfitController(terminate_at=1)"
   trainable_parameters: ["weights2", "biases2"]
+  parameter_mask: None
+  #  weights2:
+  #    [0., 0., 1., 0., 1., 1., 0., 0., 0., 0., 0., 1.]
+  #  biases2:
+  #    [1.]
   observation_vector: ["e_mean", "e_std", "KE_mean", "KE_std", "APE_mean", "APE_std"]
   gamma_vector: ["e_mean_var_loss", "e_std_var_loss", "KE_mean_var_loss", "KE_std_var_loss", "APE_mean_var_loss", "APE_std_var_loss"]
   observation_validation: ["e_mean", "e_std", "KE_mean", "KE_std", "APE_mean", "APE_std"]

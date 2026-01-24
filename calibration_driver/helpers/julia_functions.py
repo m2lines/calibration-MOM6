@@ -18,7 +18,8 @@ def initialize_eki(ANN_netcdf_default, observation_netcdf, config, optimization_
                                             config["eki"]["trainable_parameters"],
                                             config["eki"]["ens_spread"],
                                             config["eki"]["ens_size"],
-                                            config["paths"]["prior_cov"])
+                                            config["paths"]["prior_cov"],
+                                            config["eki"]["parameter_mask"])
 
     # Length of the observational vector
     len_obs = np.sum([observation_netcdf[metric].size for metric in config["eki"]["observation_vector"]])

@@ -2,7 +2,7 @@ import numpy as np
 import os
 import sys
 
-def generate_ensemble(ANN_netcdf, parameter_list, ensemble_spread, ensemble_size, prior_cov_path):
+def generate_ensemble(ANN_netcdf, parameter_list, ensemble_spread, ensemble_size, prior_cov_path, parameter_mask):
     '''
     Receives neural network netcdf object, parameter_list to perturb,
     ensemble spread and ensemble size, and returns: 
@@ -24,6 +24,8 @@ def generate_ensemble(ANN_netcdf, parameter_list, ensemble_spread, ensemble_size
                 parameter_scale = float(np.abs(parameter_vector).mean())
 
             random_perturbation = ensemble_spread * parameter_scale * np.random.randn(n_param, ensemble_size)
+            if parameter_mask != 'None':
+                random_perturbation = random_perturbation * np.array(parameter_mask[parameter_key]).reshape(-1,1)
 
             ensemble = parameter_vector.reshape(-1,1) + random_perturbation
             initial_ensemble.append(ensemble)
