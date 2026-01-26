@@ -21,8 +21,14 @@ eki:
   outlier_scale: 1.e+9
   noise_trace_ratio: 1.
   inversion: "TransformInversion()"
-  scheduler: "DataMisfitController(terminate_at=1)"
+  scheduler: "DataMisfitController(terminate_at=1e+9)"
   trainable_parameters: ["weights2", "biases2"]
+  trainable_parameters_mom6:
+   {}
+  # trainable_parameters_mom6:
+  #   ZB_SCALING:
+  #     mean: 1.0
+  #     std: 0.25
   parameter_mask: None
   #  weights2:
   #    [0., 0., 1., 0., 1., 1., 0., 0., 0., 0., 0., 1.]

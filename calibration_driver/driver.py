@@ -76,7 +76,7 @@ for iteration in range(args.latest_iteration, config["eki"]["n_iterations"]):
             exp_path = f"{iteration_path}/ens-member-{ens_member:02d}"
             
             ########## Create a new ANN object with perturbed parameters #############
-            ANN_modified = parameter_vector_to_ANN(ANN_netcdf_default, config["eki"]["trainable_parameters"], num_of_parameters, params[:,ens_member])
+            ANN_modified = parameter_vector_to_ANN(ANN_netcdf_default, config["eki"]["trainable_parameters"], num_of_parameters, params[:sum(num_of_parameters),ens_member])
 
             ############ Create a callback function to assemble a regular ANN from equivariant ANN #############
             call_function = config["singularity_command"] + \
@@ -87,6 +87,8 @@ for iteration in range(args.latest_iteration, config["eki"]["n_iterations"]):
 
             ########### Create MOM6 namelist #####################
             exp_params = PARAMETERS.add(**configuration('R2')).add(**config["mom6_namelist"])
+            for j, parameter_key in enumerate(config["eki"]["trainable_parameters_mom6"]):
+                exp_params[parameter_key] = params[sum(num_of_parameters)+j, ens_member]
             
             ########### Submit sbatch job ########################
             run_experiment(exp_path, hpc, exp_params,

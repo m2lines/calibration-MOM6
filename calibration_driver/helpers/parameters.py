@@ -2,7 +2,7 @@ import numpy as np
 import os
 import sys
 
-def generate_ensemble(ANN_netcdf, parameter_list, ensemble_spread, ensemble_size, prior_cov_path, parameter_mask):
+def generate_ensemble(ANN_netcdf, parameter_list, mom6_parameter_dict, ensemble_spread, ensemble_size, prior_cov_path, parameter_mask):
     '''
     Receives neural network netcdf object, parameter_list to perturb,
     ensemble spread and ensemble size, and returns: 
@@ -30,10 +30,20 @@ def generate_ensemble(ANN_netcdf, parameter_list, ensemble_spread, ensemble_size
             ensemble = parameter_vector.reshape(-1,1) + random_perturbation
             initial_ensemble.append(ensemble)
             num_of_parameters.append(n_param)
-        
+ 
+        for parameter_key in mom6_parameter_dict:
+            mean = mom6_parameter_dict[parameter_key]['mean']
+            std = mom6_parameter_dict[parameter_key]['std']
+            ensemble = mean + std * np.random.randn(1, ensemble_size)
+            initial_ensemble.append(ensemble)
+
         initial_ensemble = np.concatenate(initial_ensemble)
     else:
         print('Reading prior covariance matrix from the disk')
+        if (len(mom6_parameter_dict.keys()) > 0):
+            print('mom6 parameter dict is not yet tested with priors')
+            sys.exit(0)
+
         C_xx_prior = np.load(prior_cov_path)
         random_perturbation = ensemble_spread * \
             np.random.multivariate_normal(

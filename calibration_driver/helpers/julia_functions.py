@@ -16,6 +16,7 @@ def initialize_eki(ANN_netcdf_default, observation_netcdf, config, optimization_
     np.random.seed(config["eki"]["seed"])
     initial_ensemble, num_of_parameters = generate_ensemble(ANN_netcdf_default, 
                                             config["eki"]["trainable_parameters"],
+                                            config["eki"]["trainable_parameters_mom6"],
                                             config["eki"]["ens_spread"],
                                             config["eki"]["ens_size"],
                                             config["paths"]["prior_cov"],
