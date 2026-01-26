@@ -125,6 +125,7 @@ def assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd,
         metrics_netcdf[metric+'_WSE'][mask_outlier] = np.nan
         metrics_netcdf[metric+'_RMSE'][mask_outlier] = np.nan
     metrics_netcdf['WMSE'][mask_outlier] = np.nan
+    metrics_netcdf['WSE'][mask_outlier] = np.nan
     print('Filtered out outliers: ', np.where(mask_outlier)[0])
 
     # Evaluate ensemble-mean prediction
