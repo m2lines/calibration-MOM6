@@ -1,6 +1,7 @@
 import xarray as xr
 import numpy as np
 import os
+from julia import Main
 
 def return_climate_metrics(exp_path, daymax, *metrics):
     try:
@@ -127,6 +128,12 @@ def assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd,
     metrics_netcdf['WMSE'][mask_outlier] = np.nan
     metrics_netcdf['WSE'][mask_outlier] = np.nan
     print('Filtered out outliers: ', np.where(mask_outlier)[0])
+
+    # Signal to noise ratio
+    g_dash = g_ens - np.nanmean(g_ens, 1,keepdims=True)
+    metrics_netcdf['signal_covariance_trace'] = np.nanmean((g_dash**2).sum(0))
+    metrics_netcdf['noise_covariance_trace'] = Main.eval("""tr(get_obs_noise_cov(eki))""")
+    metrics_netcdf['SNR'] = metrics_netcdf['signal_covariance_trace'] / metrics_netcdf['noise_covariance_trace']
 
     # Evaluate ensemble-mean prediction
     for metric, metric_var in zip(observation_validation_names, gamma_validation_names):

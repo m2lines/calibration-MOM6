@@ -102,7 +102,7 @@ def initialize_eki(ANN_netcdf_default, observation_netcdf, config, optimization_
             # covariance = SVDplusD(internal_cov, Diagonal(background_noise));
             # """)
             # We compute SVD using numpy as it is 10000 times faster
-            if svd_noise_trace_ratio > -1.e-16:
+            if svd_noise_trace_ratio > 1.e-16:
                 U, s, Vt = np.linalg.svd(noise_ens, full_matrices=False)
 
                 # We reduce the number of degrees of freedom by one as it is done in 
@@ -115,14 +115,13 @@ def initialize_eki(ANN_netcdf_default, observation_netcdf, config, optimization_
                 background_noise = ones_vector * alpha
                 covariance = SVDplusD(internal_cov, Diagonal(background_noise));
                 """)
+                print('Computation of noise covariance matrix in SVD form is finished')
             else:
                 Main.eval("""
                 background_noise = ones_vector * alpha
                 covariance = Diagonal(background_noise)
                 """)
-
-
-            print('Computation of noise covariance matrix in SVD form is finished')
+                print('Computation of noise covariance matrix in diagonal form is finished')
         else:
             Main.covariance = np.ones_like(observation_vector)
             Main.eval("covariance = Diagonal(covariance)")
