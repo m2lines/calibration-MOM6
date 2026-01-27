@@ -19,7 +19,8 @@ eki:
   seed: 0
   seed_julia: 2
   outlier_scale: 1.e+9
-  noise_trace_ratio: 1.
+  diag_noise_trace_ratio: 1.
+  svd_noise_trace_ratio: 0.
   inversion: "TransformInversion()"
   scheduler: "DataMisfitController(terminate_at=1e+9)"
   trainable_parameters: ["weights2", "biases2"]
