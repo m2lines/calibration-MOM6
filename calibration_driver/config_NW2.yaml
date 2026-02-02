@@ -42,7 +42,13 @@ eki:
   metrics_function: "return_climate_metrics"
 
 mom6_namelist:
-  DAYMAX: 7300.0
+  NIGLOBAL: 120
+  NJGLOBAL: 280
+  DT: 900.
+  HMIX_UV_SFC_PROP: 5.0
+  INTERNAL_WAVE_SPEED_BETTER_EST: False
+  SMAG_BI_CONST: 0.06
+  DAYMAX: 1800.
   USE_ZB2020: "True"
   ZB2020_USE_ANN: "True"
   ZB2020_ANN_FILE_TALL: "INPUT/Tall.nc"
@@ -52,11 +58,11 @@ mom6_namelist:
 slurm_eki: "sbatch --time=02:00:00 --cpus-per-task=4 --mem=16GB"
 
 slurm_mom6:
-  time: 2
+  time: 4
   nodes: 1
-  ntasks: 1
-  mem: 0.5
-  partition: ""
+  ntasks: 32
+  mem: 10
+  partition: "#SBATCH --partition=cs"
 
 #singularity_command: "singularity exec --nv --overlay /scratch/$USER/python-container/python-overlay.ext3:ro --bind /scratch/pp2681/python-container/escnn-cache:/ext3/miniconda3/lib/python3.11/site-packages/escnn/group/_cache/ /share/apps/images/cuda12.3.2-cudnn9.0.0-ubuntu-22.04.4.sif"
 

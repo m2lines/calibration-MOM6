@@ -20,6 +20,7 @@ def create_slurm(p, filename, call_function):
     '#SBATCH --begin=now+'+str(p['begin']),
     '#SBATCH --job-name='+str(p['name']),
     '#SBATCH --export=NONE',
+    str(p['partition']),
 
     
     'scontrol show job $SLURM_JOB_ID',
@@ -114,7 +115,8 @@ HPC = dictionary(
     mem=0.5,
     time=24,
     name='mom6',
-    begin='0hour'
+    begin='0hour',
+    partition=''
 )  
 
 PARAMETERS = dictionary(

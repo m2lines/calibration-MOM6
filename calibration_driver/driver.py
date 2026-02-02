@@ -88,6 +88,7 @@ for iteration in range(args.latest_iteration, config["eki"]["n_iterations"]):
                 nodes=config["slurm_mom6"]["nodes"],
                 ntasks=config["slurm_mom6"]["ntasks"],
                 mem=config["slurm_mom6"]["mem"],
+                partition=config["slurm_mom6"]["partition"],
                 begin='1minute', 
                 executable=config["paths"]["executable"])
 
