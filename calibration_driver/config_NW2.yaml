@@ -1,12 +1,12 @@
 tag: "20y"
 
 paths:
-  base: "/scratch/pp2681/mom6/CM26_Double_Gyre/calibration/20-years"
-  optimization_folder: "R2_FGR3_series_torch"
-  ann: "/scratch/pp2681/mom6/CM26_ML_models/ocean3d/subfilter/FGR3/equivariant/learning_rate/N8-forcing-fluxes/0.05/model/"
+  base: "/scratch/pp2681/mom6/Neverworld2/calibration/1800days"
+  optimization_folder: "precalibrated"
+  ann: "/scratch/pp2681/mom6/CM26_Double_Gyre/calibration/20-years/R2_FGR3_mean_only_scaling/iteration-05/ens-member-00/INPUT/Tall.nc"
   observation: "/home/pp2681/calibration/scripts/R32/R2_FGR3_series_loss.nc"
   executable: "/scratch/pp2681/MOM6-examples/build/compiled_executables/MOM6-dev-m2lines-Aug18"
-  configuration: "/home/pp2681/MOM6-examples/build/configurations/double_gyre_long"
+  configuration: "/home/pp2681/MOM6-examples/build/configurations/NW2_1800"
   noise_model: None
   #noise_model: "/scratch/pp2681/mom6/CM26_Double_Gyre/calibration/20-years/noise_model/metrics_00.nc"
   prior_cov: None
@@ -16,16 +16,19 @@ eki:
   n_iterations: 5
   ens_size: 100
   ens_spread: 0.25
-  seed: 0
-  seed_julia: 2
-  outlier_scale: 1.e+9
+  seed: 2
+  seed_julia: 4
+  outlier_scale: 10
   diag_noise_trace_ratio: 1.
   svd_noise_trace_ratio: 0.
   inversion: "TransformInversion()"
   scheduler: "DataMisfitController(terminate_at=1e+9)"
   trainable_parameters: ["weights2", "biases2"]
   trainable_parameters_mom6:
-   {}
+    ZB_SCALING:
+      mean: 1.0
+      std: 0.25
+
   # trainable_parameters_mom6:
   #   ZB_SCALING:
   #     mean: 1.0
@@ -35,8 +38,8 @@ eki:
   #    [0., 0., 1., 0., 1., 1., 0., 0., 0., 0., 0., 1.]
   #  biases2:
   #    [1.]
-  observation_vector: ["e_mean", "e_std", "KE_mean", "KE_std", "APE_mean", "APE_std"]
-  gamma_vector: ["e_mean_var_loss", "e_std_var_loss", "KE_mean_var_loss", "KE_std_var_loss", "APE_mean_var_loss", "APE_std_var_loss"]
+  observation_vector: ["e_mean", "e_std", "KE_mean", "APE_mean"]
+  gamma_vector: ["e_mean_var_loss", "e_std_var_loss", "KE_mean_var_loss", "APE_mean_var_loss"]
   observation_validation: ["e_mean", "e_std", "KE_mean", "KE_std", "APE_mean", "APE_std"]
   gamma_validation: ["e_mean_var_loss", "e_std_var_loss", "KE_mean_var_loss", "KE_std_var_loss", "APE_mean_var_loss", "APE_std_var_loss"]
   metrics_function: "return_climate_metrics"
