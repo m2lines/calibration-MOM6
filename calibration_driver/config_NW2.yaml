@@ -38,6 +38,7 @@ eki:
   #    [0., 0., 1., 0., 1., 1., 0., 0., 0., 0., 0., 1.]
   #  biases2:
   #    [1.]
+  ave_start_day: 1000.
   observation_vector: ["e_mean", "e_std", "KE_mean", "APE_mean"]
   gamma_vector: ["e_mean_var_loss", "e_std_var_loss", "KE_mean_var_loss", "APE_mean_var_loss"]
   observation_validation: ["e_mean", "e_std", "KE_mean", "KE_std", "APE_mean", "APE_std"]

@@ -2,10 +2,10 @@ import xarray as xr
 import numpy as np
 import os
 
-def return_climate_metrics(exp_path, daymax, *metrics):
+def return_climate_metrics(exp_path, ave_start_day, daymax, *metrics):
     try:
-        prog = xr.open_mfdataset(f'{exp_path}/prog_*.nc', decode_times=False).astype('float64').sortby('Time').sel(Time=slice(365*10,None)).isel(zi=slice(0,2)).fillna(0.)
-        series = 1e-15 * xr.open_mfdataset(f'{exp_path}/ocean.stats.nc', decode_times=False).astype('float64').sel(Time=slice(365*10,None)).isel(Interface=slice(0,2)).rename({'Layer': 'zl', 'Interface': 'zi'})[['KE', 'APE']]
+        prog = xr.open_mfdataset(f'{exp_path}/prog_*.nc', decode_times=False).astype('float64').sortby('Time').sel(Time=slice(ave_start_day,daymax)).isel(zi=slice(0,-1)).fillna(0.)
+        series = 1e-15 * xr.open_mfdataset(f'{exp_path}/ocean.stats.nc', decode_times=False).astype('float64').sel(Time=slice(ave_start_day,daymax)).isel(Interface=slice(0,-1)).rename({'Layer': 'zl', 'Interface': 'zi'})[['KE', 'APE']]
     except:
         return False
 
@@ -42,7 +42,7 @@ def return_climate_metrics(exp_path, daymax, *metrics):
 
 def assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd, iteration,
                                         observation_netcdf, params,
-                                        daymax, len_obs, ens_size, 
+                                        ave_start_day, daymax, len_obs, ens_size, 
                                         outlier_scale, metrics_function_name,
                                         observation_vector_names, gamma_vector_names,
                                         observation_validation_names, gamma_validation_names):
@@ -71,7 +71,7 @@ def assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd,
         
         # Compute metrics used for the optimization as a dictionaty
         metrics_function = eval(metrics_function_name) 
-        metrics_data = metrics_function(exp_path, daymax, *observation_validation_names)
+        metrics_data = metrics_function(exp_path, ave_start_day, daymax, *observation_validation_names)
         
         # Concatenate metrics to a vector
         if isinstance(metrics_data, dict):

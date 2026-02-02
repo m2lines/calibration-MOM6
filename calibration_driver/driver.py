@@ -52,6 +52,7 @@ for iteration in range(args.latest_iteration, config["eki"]["n_iterations"]):
         print('Processing Forward model outputs...')
         g_ens = assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd, iteration,
             observation_netcdf, params,
+            config["eki"]["ave_start_day"],
             config["mom6_namelist"]["DAYMAX"], 
             len_obs, config["eki"]["ens_size"],
             config["eki"]["outlier_scale"], config["eki"]["metrics_function"],
