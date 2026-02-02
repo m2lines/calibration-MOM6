@@ -59,6 +59,8 @@ mom6_namelist:
   ZB_SCALING: 1.0
   BOUND_CORIOLIS_BIHARM: True
   ZB_KLOWER_R_DISS: 1.
+  U_TRUNC_FILE: "U_velocity_truncations"
+  V_TRUNC_FILE: "V_velocity_truncations"
 
 slurm_eki: "sbatch --time=02:00:00 --cpus-per-task=4 --mem=16GB"
 

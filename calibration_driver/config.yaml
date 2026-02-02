@@ -43,11 +43,21 @@ eki:
 
 mom6_namelist:
   DAYMAX: 7300.0
+  NIGLOBAL: 44
+  NJGLOBAL: 40
+  DT: 2160.
+  DT_FORCING: 2160.
+  LAPLACIAN: False
+  BIHARMONIC: True
+  SMAGORINSKY_AH: True
+  SMAG_BI_CONST: 0.06 
   USE_ZB2020: "True"
   ZB2020_USE_ANN: "True"
   ZB2020_ANN_FILE_TALL: "INPUT/Tall.nc"
   USE_CIRCULATION_IN_HORVISC: "True"
   ZB_SCALING: 1.0
+  U_TRUNC_FILE: "U_velocity_truncations"
+  V_TRUNC_FILE: "V_velocity_truncations"
 
 slurm_eki: "sbatch --time=02:00:00 --cpus-per-task=4 --mem=16GB"
 
