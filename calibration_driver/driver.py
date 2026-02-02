@@ -83,7 +83,13 @@ for iteration in range(args.latest_iteration, config["eki"]["n_iterations"]):
                             f' /bin/bash -c "source /ext3/env.sh; time python /home/pp2681/calibration/scripts/eANN_to_ANN.py --netcdf_ANN={config["paths"]["ann"]}/Tall.nc --netcdf_eANN={exp_path}/INPUT/eANN.nc --netcdf_output={exp_path}/INPUT/Tall.nc"'
 
             ############ Create HPC profile ######################
-            hpc = HPC.add(name=config["tag"], time=config["slurm_mom6"]["time"], begin='1minute', executable=config["paths"]["executable"])
+            hpc = HPC.add(name=config["tag"], 
+                time=config["slurm_mom6"]["time"], 
+                nodes=config["slurm_mom6"]["nodes"],
+                ntasks=config["slurm_mom6"]["ntasks"],
+                mem=config["slurm_mom6"]["mem"],
+                begin='1minute', 
+                executable=config["paths"]["executable"])
 
             ########### Create MOM6 namelist #####################
             exp_params = PARAMETERS.add(**configuration('R2')).add(**config["mom6_namelist"])
