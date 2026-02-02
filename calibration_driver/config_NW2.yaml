@@ -3,7 +3,7 @@ tag: "20y"
 paths:
   base: "/scratch/pp2681/mom6/Neverworld2/calibration/1800days"
   optimization_folder: "precalibrated"
-  ann: "/scratch/pp2681/mom6/CM26_Double_Gyre/calibration/20-years/R2_FGR3_mean_only_scaling/iteration-05/ens-member-00/INPUT/Tall.nc"
+  ann: "/scratch/pp2681/mom6/CM26_Double_Gyre/calibration/20-years/R2_FGR3_mean_only_scaling/iteration-05/ens-member-00/INPUT"
   observation: "/home/pp2681/calibration/scripts/R32/R2_FGR3_series_loss.nc"
   executable: "/scratch/pp2681/MOM6-examples/build/compiled_executables/MOM6-dev-m2lines-Aug18"
   configuration: "/home/pp2681/MOM6-examples/build/configurations/NW2_1800"

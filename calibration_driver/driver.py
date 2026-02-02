@@ -93,7 +93,7 @@ for iteration in range(args.latest_iteration, config["eki"]["n_iterations"]):
                 executable=config["paths"]["executable"])
 
             ########### Create MOM6 namelist #####################
-            exp_params = config["mom6_namelist"]
+            exp_params = config["mom6_namelist"].copy()
             for j, parameter_key in enumerate(config["eki"]["trainable_parameters_mom6"]):
                 exp_params[parameter_key] = params[sum(num_of_parameters)+j, ens_member]
             
