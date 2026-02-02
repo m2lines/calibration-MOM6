@@ -1,7 +1,6 @@
 import xarray as xr
 import numpy as np
 import os
-from julia import Main
 
 def return_climate_metrics(exp_path, daymax, *metrics):
     try:

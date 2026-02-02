@@ -344,7 +344,7 @@ class CollectionOfExperiments:
             plt.ylabel('Power spectrum [m$^3$/s$^4$]')
             plt.title('')
             
-    def plot_ssh(self, exps, labels=None, target=None, ncols=3, zi=0):
+    def plot_ssh(self, exps, labels=None, target=None, ncols=3, zi=0, vmax=3.0, cmap='RdBu_r', clabel=True, show_rmse=True):
         if labels is None:
             labels=exps
         nfig = len(exps)
@@ -355,8 +355,8 @@ class CollectionOfExperiments:
         else:
             nrows = 1
 
-        if zi ==0:
-            levels_field = np.arange(-4,4.5,0.5)
+        if zi == 0:
+            levels_field = np.arange(-vmax,vmax+0.5,0.5)
             levels_bias = np.arange(-2,2.2,0.2)
         else:
             levels_field = np.arange(-1400,-550,50)
@@ -378,10 +378,11 @@ class CollectionOfExperiments:
                 levels = levels_bias
                 label = 'SSH bias [m]'
                 lines = False
-            ssh.plot.contourf(levels=levels, cmap='bwr', linewidths=1, extend='both', cbar_kwargs={'label': label})
+            ssh.plot.contourf(levels=levels, cmap=cmap, linewidths=1, extend='both', cbar_kwargs={'label': label})
             if lines:
                 Cplot = ssh.plot.contour(levels=levels, colors='k', linewidths=1)
-                plt.gca().clabel(Cplot, Cplot.levels)
+                if clabel:
+                    plt.gca().clabel(Cplot, Cplot.levels)
             plt.xticks((0, 5, 10, 15, 20))
             plt.yticks((30, 35, 40, 45, 50))
             plt.xlabel('Longitude')
@@ -391,7 +392,8 @@ class CollectionOfExperiments:
             if exp != exps[-1]:
                 RMSE = Lk_error(self[exp].e_mean.isel(zi=zi),self[exps[-1]].e_mean.isel(zi=zi))[0]
                 #print(RMSE)
-                plt.text(9,31,'RMSE='+str(round(RMSE,3))+'$m$', fontsize=14)
+                if show_rmse:
+                    plt.text(9,31,'RMSE='+str(round(RMSE,3))+'$m$', fontsize=14)
 
         plt.tight_layout()
 

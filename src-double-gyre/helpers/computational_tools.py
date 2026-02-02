@@ -445,7 +445,8 @@ def gaussian_remesh(_input, output_mask, input_mask, FGR=np.sqrt(6)):
                 output_mask)
 
 def compute_isotropic_KE(u_in, v_in, dx, dy, Lat=(35,45), Lon=(5,15), window='hann', 
-        nfactor=2, truncate=True, detrend='linear', window_correction=True, nd_wavenumber=False):
+        nfactor=2, truncate=True, detrend='linear', window_correction=True,
+        interp_freq=True):
     '''
     u, v - "velocity" arrays defined on corresponding staggered grids
     dx, dy - grid step arrays defined in the center of the cells
@@ -484,13 +485,16 @@ def compute_isotropic_KE(u_in, v_in, dx, dy, Lat=(35,45), Lon=(5,15), window='ha
     E = (Eu+Ev) / 2 # because power spectrum is twice the energy
     E['freq_r'] = E['freq_r']*2*np.pi # because library returns frequencies, but not wavenumbers
 
-    if nd_wavenumber:
+    if interp_freq:
+        n = len(u.xh)
         Lx = x.max() - x.min()
         Ly = y.max() - y.min()
-        kmin = 2*np.pi * min(1/Lx, 1/Ly)
-        E['freq_r'] = E['freq_r'] / kmin
-        E = E * kmin
-    
+        L = np.sqrt(Lx**2 + Ly**2)
+        freq_target = 2 * np.pi / L * np.arange(1,n/2)
+
+        E = E.interp(freq_r=freq_target)
+        E = E.dropna(dim="freq_r")
+
     ############## normalization tester #############
     #print('Energy balance:')
     #print('mean(u^2+v^2)/2=', ((u**2+v**2)/2).mean(dim=('Time', 'xh', 'yh')).values)
