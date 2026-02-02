@@ -31,7 +31,7 @@ def create_slurm(p, filename, call_function):
     'source ~/MOM6-examples/build/intel/env',
     'module list',
     'for e in $(env | egrep ^SLURM_ | cut -d= -f1); do unset ${e}; done',
-    'mpiexec --bind-to none -np ' + str(p['ntasks']) + ' env LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ' + p['executable'],
+    'mpirun --bind-to none -n ' + str(p['ntasks']) + ' env LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ' + p['executable'],
 
     'mkdir -p output',
     'mv *.nc output',

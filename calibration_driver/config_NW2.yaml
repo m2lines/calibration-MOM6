@@ -54,6 +54,8 @@ mom6_namelist:
   ZB2020_ANN_FILE_TALL: "INPUT/Tall.nc"
   USE_CIRCULATION_IN_HORVISC: "True"
   ZB_SCALING: 1.0
+  BOUND_CORIOLIS_BIHARM: True
+  ZB_KLOWER_R_DISS: 1.
 
 slurm_eki: "sbatch --time=02:00:00 --cpus-per-task=4 --mem=16GB"
 
