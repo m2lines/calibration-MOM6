@@ -4,7 +4,10 @@ import os
 
 def return_climate_metrics(exp_path, ave_start_day, daymax, *metrics):
     try:
-        prog = xr.open_mfdataset(f'{exp_path}/prog_*.nc', decode_times=False).astype('float64').sortby('Time').sel(Time=slice(ave_start_day,daymax)).isel(zi=slice(0,-1)).fillna(0.)
+        prog = xr.open_mfdataset(f'{exp_path}/prog_*.nc', decode_times=False).astype('float64').isel(zi=slice(0,-1)).fillna(0.)
+        if 'time' in prog.dims:
+            prog = prog.rename({'time': 'Time'})    
+        prog = prog.sortby('Time').sel(Time=slice(ave_start_day,daymax))
         series = 1e-15 * xr.open_mfdataset(f'{exp_path}/ocean.stats.nc', decode_times=False).astype('float64').sel(Time=slice(ave_start_day,daymax)).isel(Interface=slice(0,-1)).rename({'Layer': 'zl', 'Interface': 'zi'})[['KE', 'APE']]
     except:
         return False
@@ -131,7 +134,12 @@ def assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd,
     # Signal to noise ratio
     g_dash = g_ens - np.nanmean(g_ens, 1,keepdims=True)
     metrics_netcdf['signal_covariance_trace'] = np.nanmean((g_dash**2).sum(0))
-    metrics_netcdf['noise_covariance_trace'] = Main.eval("""tr(get_obs_noise_cov(eki))""")
+    try:
+        metrics_netcdf['noise_covariance_trace'] = Main.eval("""tr(get_obs_noise_cov(eki))""")
+        print('Noise covariance trace is computed directly')
+    except:
+        metrics_netcdf['noise_covariance_trace'] = g_dash.shape[0]
+        print('Noise covariance trace is computed as dim(obs)')
     metrics_netcdf['SNR'] = metrics_netcdf['signal_covariance_trace'] / metrics_netcdf['noise_covariance_trace']
 
     # Evaluate ensemble-mean prediction

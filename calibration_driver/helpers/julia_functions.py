@@ -55,6 +55,9 @@ def initialize_eki(ANN_netcdf_default, observation_netcdf, config, optimization_
         # the defined scalar product
         Main.observation_vector = observation_vector / np.sqrt(gamma_vector)
         Main.initial_ensemble = initial_ensemble
+        Main.ones_vector = np.ones_like(observation_vector)
+
+        print('Observation vector is ready')
 
         ############### Create noise model #####################
         if os.path.exists(config["paths"]["noise_model"]):
@@ -90,7 +93,6 @@ def initialize_eki(ANN_netcdf_default, observation_netcdf, config, optimization_
 
             Main.noise_ens = noise_ens
             Main.alpha = alpha
-            Main.ones_vector = np.ones_like(observation_vector)
 
             # Here we compute the covariance matrix using SVD
             # with help of standard EnsembleKalmanProcesses.jl workflow
@@ -123,8 +125,10 @@ def initialize_eki(ANN_netcdf_default, observation_netcdf, config, optimization_
                 """)
                 print('Computation of noise covariance matrix in diagonal form is finished')
         else:
-            Main.covariance = np.ones_like(observation_vector)
-            Main.eval("covariance = Diagonal(covariance)")
+            print('Preparing trivial noise covariance matrix')
+            Main.sigma2 = config["eki"]["sigma2"]
+            Main.eval("covariance = sigma2 * I")
+            print('Prescribing unity matrix as noise covariance is finished')
 
         Main.eval(f"""
             observation = Observation(Dict(
@@ -139,6 +143,7 @@ def initialize_eki(ANN_netcdf_default, observation_netcdf, config, optimization_
             localization_method = EnsembleKalmanProcesses.Localizers.NoLocalization(),
             verbose=true)
             """)
+        print('Initialization of EKI Julia object is finished')
     
     return len_obs, num_of_parameters
     

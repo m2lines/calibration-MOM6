@@ -78,8 +78,10 @@ class CollectionOfExperiments:
         '''
         folders = []
         for root, dirs, files in os.walk(common_folder):
+            folder = root[len(common_folder)+1:] # Path w.r.t. common_folder
+            #print('Check:', folder)
             if os.path.isfile(os.path.join(root, additional_subfolder, 'ocean_geometry.nc')):
-                folder = root[len(common_folder)+1:] # Path w.r.t. common_folder
+                #print('Add:', folder)
                 folders.append(
                     folder
                     )
@@ -138,6 +140,7 @@ class CollectionOfExperiments:
             im = KE.isel(Layer=1).plot(ax=ax[0,1], label=labels[j], color=colors.get(exp,None), lw=lw)
             color = im[0].get_color()
             ax[0,1].axhline(y = KE_mean.isel(Layer=1), linestyle='--', color=color)
+            ax[0,1].set_ylim([-1.e+14, 1.e+15])
 
             im = APE.isel(Interface=0).plot(ax=ax[1,0], label=labels[j], color=colors.get(exp,None), lw=lw)
             color = im[0].get_color()
@@ -418,9 +421,9 @@ class CollectionOfExperiments:
             plt.subplot(nrows,ncol,ifig+1)
             ssh = remesh(self[exp].e_std.isel(zi=zi),self[target].e_std.isel(zi=zi))
             if zi==0:
-                levels = np.arange(0,1.1,0.1)
+                levels = np.arange(0,0.65,0.05)
             else:
-                levels = np.arange(0,110,10)
+                levels = np.arange(0,65,5)
             label = 'SSH std [m]'
 
             ssh.plot.contourf(levels=levels, cmap=cmocean.cm.balance, linewidths=1, cbar_kwargs={'label': label})
@@ -453,7 +456,7 @@ class CollectionOfExperiments:
             plt.subplot(nrows,ncol,ifig+1)
             EKE = remesh(self[exp].EKE, self[target].EKE)
             if zl==0:
-                levels = np.linspace(0,1e-2,11)
+                levels = np.linspace(0,0.005,11)
             else:
                 levels = np.linspace(0,5e-3,13)
             label = 'EKE, $m^{2}s^{-2}$'

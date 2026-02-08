@@ -4,7 +4,7 @@ paths:
   base: "/scratch/pp2681/mom6/Neverworld2/calibration/1800days"
   optimization_folder: "precalibrated"
   ann: "/scratch/pp2681/mom6/CM26_Double_Gyre/calibration/20-years/R2_FGR3_mean_only_scaling/iteration-05/ens-member-00/INPUT"
-  observation: "/home/pp2681/calibration/scripts/R32/R2_FGR3_series_loss.nc"
+  observation:  "/home/pp2681/calibration/scripts/R32_R2_FGR3_NW2/800days_v1.nc"
   executable: "/scratch/pp2681/MOM6-examples/build/compiled_executables/MOM6-dev-m2lines-Aug18"
   configuration: "/home/pp2681/MOM6-examples/build/configurations/NW2_1800"
   noise_model: None
@@ -21,18 +21,14 @@ eki:
   outlier_scale: 10
   diag_noise_trace_ratio: 1.
   svd_noise_trace_ratio: 0.
+  sigma2: 5.e-2
   inversion: "TransformInversion()"
-  scheduler: "DataMisfitController(terminate_at=1e+9)"
+  scheduler: "DefaultScheduler()"
   trainable_parameters: ["weights2", "biases2"]
   trainable_parameters_mom6:
     ZB_SCALING:
       mean: 1.0
       std: 0.25
-
-  # trainable_parameters_mom6:
-  #   ZB_SCALING:
-  #     mean: 1.0
-  #     std: 0.25
   parameter_mask: None
   #  weights2:
   #    [0., 0., 1., 0., 1., 1., 0., 0., 0., 0., 0., 1.]
@@ -40,9 +36,9 @@ eki:
   #    [1.]
   ave_start_day: 1000.
   observation_vector: ["e_mean", "e_std", "KE_mean", "APE_mean"]
-  gamma_vector: ["e_mean_var_loss", "e_std_var_loss", "KE_mean_var_loss", "APE_mean_var_loss"]
+  ["e_mean_var_ctrl", "e_std_var_ctrl", "KE_mean_var_ctrl", "APE_mean_var_ctrl"]
   observation_validation: ["e_mean", "e_std", "KE_mean", "KE_std", "APE_mean", "APE_std"]
-  gamma_validation: ["e_mean_var_loss", "e_std_var_loss", "KE_mean_var_loss", "KE_std_var_loss", "APE_mean_var_loss", "APE_std_var_loss"]
+  gamma_validation: ["e_mean_var_ctrl", "e_std_var_ctrl", "KE_mean_var_ctrl", "KE_std_var_loss", "APE_mean_var_ctrl", "APE_std_var_loss"]
   metrics_function: "return_climate_metrics"
 
 mom6_namelist:
@@ -63,10 +59,10 @@ mom6_namelist:
   U_TRUNC_FILE: "U_velocity_truncations"
   V_TRUNC_FILE: "V_velocity_truncations"
 
-slurm_eki: "sbatch --time=02:00:00 --cpus-per-task=4 --mem=16GB"
+slurm_eki: "sbatch --time=02:00:00 --cpus-per-task=4 --mem=32GB"
 
 slurm_mom6:
-  time: 4
+  time: 3
   nodes: 1
   ntasks: 32
   mem: 10
