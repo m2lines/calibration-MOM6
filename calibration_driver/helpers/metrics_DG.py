@@ -69,7 +69,7 @@ def assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd,
 
     # Each list element is metrics for an ensemble member
     metrics_netcdf_list = []
-    for ens_member in range(ens_size):
+    for ens_member in range(ens_size+1):
         exp_path = f"{iteration_path}/ens-member-{ens_member:02d}/output"
         
         # Compute metrics used for the optimization as a dictionaty
@@ -77,7 +77,7 @@ def assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd,
         metrics_data = metrics_function(exp_path, ave_start_day, daymax, *observation_validation_names)
         
         # Concatenate metrics to a vector
-        if isinstance(metrics_data, dict):
+        if isinstance(metrics_data, dict) and ens_member < ens_size:
             g_ens[:,ens_member] = np.concatenate([metrics_data[metric].ravel() / np.sqrt(observation_netcdf[gamma].values.ravel()) for metric, gamma in zip(observation_vector_names, gamma_vector_names)])
             print(f'Ensemble member {ens_member} succesfully ingested')
         else:
@@ -117,18 +117,18 @@ def assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd,
 
     # Concatenate over the ensemble members
     metrics_netcdf = xr.concat(metrics_netcdf_list, dim='ens')
-    metrics_netcdf['param'] = xr.DataArray(params, dims=['pdim', 'ens']).transpose('ens',...)
+    metrics_netcdf['param'] = xr.DataArray(np.concatenate([params, params.mean(axis=1, keepdims=True)], axis=1), dims=['pdim', 'ens']).transpose('ens',...)
 
     # Find outliers to be excluded from the optimization
-    min_WMSE = float(metrics_netcdf['WMSE'].min())
-    mask_outlier = metrics_netcdf['WMSE'] > min_WMSE * outlier_scale
+    min_WMSE = float(metrics_netcdf['WMSE'].isel(ens=slice(None,-1)).min())
+    mask_outlier = metrics_netcdf['WMSE'].isel(ens=slice(None,-1)) > min_WMSE * outlier_scale
     g_ens[:,mask_outlier] = np.nan
     for metric in observation_validation_names:
-        metrics_netcdf[metric][mask_outlier] = np.nan
-        metrics_netcdf[metric+'_WSE'][mask_outlier] = np.nan
-        metrics_netcdf[metric+'_RMSE'][mask_outlier] = np.nan
-    metrics_netcdf['WMSE'][mask_outlier] = np.nan
-    metrics_netcdf['WSE'][mask_outlier] = np.nan
+        metrics_netcdf[metric].isel(ens=slice(None,-1))[mask_outlier] = np.nan
+        metrics_netcdf[metric+'_WSE'].isel(ens=slice(None,-1))[mask_outlier] = np.nan
+        metrics_netcdf[metric+'_RMSE'].isel(ens=slice(None,-1))[mask_outlier] = np.nan
+    metrics_netcdf['WMSE'].isel(ens=slice(None,-1))[mask_outlier] = np.nan
+    metrics_netcdf['WSE'].isel(ens=slice(None,-1))[mask_outlier] = np.nan
     print('Filtered out outliers: ', np.where(mask_outlier)[0])
 
     # Signal to noise ratio
@@ -144,7 +144,7 @@ def assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd,
 
     # Evaluate ensemble-mean prediction
     for metric, metric_var in zip(observation_validation_names, gamma_validation_names):
-        error = metrics_netcdf[metric].mean('ens') - observation_netcdf[metric]
+        error = metrics_netcdf[metric].isel(ens=slice(None,-1)).mean('ens') - observation_netcdf[metric]
         variance = observation_netcdf[metric_var]
         spatial_ave_dims = []
         for dim in ['xh', 'yh', 'xq', 'yq']:
@@ -155,7 +155,7 @@ def assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd,
     metrics_netcdf['WMSE_MAP'] = np.sum([metrics_netcdf[metric+'_WSE_MAP'] for metric in observation_vector_names]) / len_obs
     metrics_netcdf['WSE_MAP'] = metrics_netcdf['WMSE_MAP'] * len_obs
     
-    # Expand dimenion for iteration
+    # Expand dimension for iteration
     metrics_netcdf = metrics_netcdf.expand_dims(iter=[iteration]).transpose('iter', 'ens',...)
 
     metrics_netcdf.astype('float32').to_netcdf(f'{optimization_folder_pwd}/metrics_{iteration:02d}.nc')

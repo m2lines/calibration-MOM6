@@ -73,11 +73,17 @@ for iteration in range(args.latest_iteration, config["eki"]["n_iterations"]):
 
     else:
         print('Run experiments in folder ', iteration_path)
-        for ens_member in range(config["eki"]["ens_size"]):
+        for ens_member in range(config["eki"]["ens_size"]+1):
             exp_path = f"{iteration_path}/ens-member-{ens_member:02d}"
             
             ########## Create a new ANN object with perturbed parameters #############
-            ANN_modified = parameter_vector_to_ANN(ANN_netcdf_default, config["eki"]["trainable_parameters"], num_of_parameters, params[:sum(num_of_parameters),ens_member])
+            if ens_member == config["eki"]["ens_size"]:
+                # Compute ensemble-mean prediction
+                parameter_vector = params[:,:].mean(axis=1)
+            else:
+                parameter_vector = params[:,ens_member]
+
+            ANN_modified = parameter_vector_to_ANN(ANN_netcdf_default, config["eki"]["trainable_parameters"], num_of_parameters, parameter_vector[:sum(num_of_parameters)])
 
             ############ Create a callback function to assemble a regular ANN from equivariant ANN #############
             call_function = config["singularity_command"] + \
@@ -96,7 +102,7 @@ for iteration in range(args.latest_iteration, config["eki"]["n_iterations"]):
             ########### Create MOM6 namelist #####################
             exp_params = config["mom6_namelist"].copy()
             for j, parameter_key in enumerate(config["eki"]["trainable_parameters_mom6"]):
-                exp_params[parameter_key] = params[sum(num_of_parameters)+j, ens_member]
+                exp_params[parameter_key] = parameter_vector[sum(num_of_parameters)+j]
             
             ########### Submit sbatch job ########################
             run_experiment(exp_path, hpc, exp_params,
