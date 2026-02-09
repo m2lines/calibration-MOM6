@@ -1,8 +1,12 @@
+try:
+    from julia import Main
+except:
+    pass
 import xarray as xr
 import numpy as np
 import os
 
-def return_climate_metrics(exp_path, ave_start_day, daymax, *metrics):
+def return_climate_metrics(exp_path, ave_start_day, daymax, observation_netcdf, *metrics):
     try:
         prog = xr.open_mfdataset(f'{exp_path}/prog_*.nc', decode_times=False).astype('float64').isel(zi=slice(0,-1)).fillna(0.)
         if 'time' in prog.dims:
@@ -38,6 +42,26 @@ def return_climate_metrics(exp_path, ave_start_day, daymax, *metrics):
                 metrics_data[metric] = prog.u.std('Time').values
             case "v_std":
                 metrics_data[metric] = prog.v.std('Time').values
+            case "power_PCA_sqrt":
+                # Extract interfaces
+                interfaces = prog.e.compute().astype('float64')
+                if np.isnan(interfaces).any():
+                    print('NaNs in interfaces, cannot compute power_PCA_sqrt metric')
+                    return False
+                # Scale interfaces by reduced gravity ratio
+                interfaces_scaled = ((interfaces - interfaces.mean('Time')) / observation_netcdf['g_ratio']).compute()
+                # Select time dimension length
+                Nt = interfaces_scaled.shape[0]
+                # Reshape Nz x Ny x Nx into a single dimension
+                X = interfaces_scaled.values.reshape(Nt,-1)
+                # Read Basis of EOFs, where the first dimension is the PCA number and second dimension is the stacked spatial dimensions
+                Vh = observation_netcdf['PCA_Vh'].transpose('PCA','NzNyNx').values
+                # Project data matrix to the cooordinate space of EOFs
+                Y = X @ Vh.T
+                # Compute power spectrum of PCAs by averaging over time
+                Power = Y.var(0)
+                # Return square root of power spectrum, so the physical dimensions are metres, same as e_mean
+                metrics_data[metric] = np.sqrt(Power)
 
     prog.close()
     series.close()
@@ -74,7 +98,7 @@ def assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd,
         
         # Compute metrics used for the optimization as a dictionaty
         metrics_function = eval(metrics_function_name) 
-        metrics_data = metrics_function(exp_path, ave_start_day, daymax, *observation_validation_names)
+        metrics_data = metrics_function(exp_path, ave_start_day, daymax, observation_netcdf, *observation_validation_names)
         
         # Concatenate metrics to a vector
         if isinstance(metrics_data, dict) and ens_member < ens_size:
@@ -98,7 +122,7 @@ def assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd,
             variance = observation_netcdf[metric_var]
             # Determine spatial dimensions for averaging/summation
             spatial_ave_dims = []
-            for dim in ['xh', 'yh', 'xq', 'yq']:
+            for dim in ['xh', 'yh', 'xq', 'yq', 'PCA']:
                 if dim in error.dims:
                     spatial_ave_dims.append(dim)
             
@@ -109,7 +133,7 @@ def assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd,
         
         # Compute total weighted mean squared error as it is computed by Ensemble Kalman Processes.jl
         # Here we consider only those metrics which are in the loss function
-        metrics_netcdf['WMSE'] = np.sum([metrics_netcdf[metric+'_WSE'] for metric in observation_vector_names]) / len_obs
+        metrics_netcdf['WMSE'] = np.sum([metrics_netcdf[metric+'_WSE'].sum(skipna=False) for metric in observation_vector_names]) / len_obs
         metrics_netcdf['WSE'] = metrics_netcdf['WMSE'] * len_obs
         
         # Append the experiment to the list
@@ -147,12 +171,12 @@ def assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd,
         error = metrics_netcdf[metric].isel(ens=slice(None,-1)).mean('ens') - observation_netcdf[metric]
         variance = observation_netcdf[metric_var]
         spatial_ave_dims = []
-        for dim in ['xh', 'yh', 'xq', 'yq']:
+        for dim in ['xh', 'yh', 'xq', 'yq', 'PCA']:
             if dim in error.dims:
                 spatial_ave_dims.append(dim)
         metrics_netcdf[metric+'_WSE_MAP'] = (error * error / variance).sum(spatial_ave_dims)
         metrics_netcdf[metric+'_RMSE_MAP'] = np.sqrt((error * error).mean(spatial_ave_dims, skipna=False))
-    metrics_netcdf['WMSE_MAP'] = np.sum([metrics_netcdf[metric+'_WSE_MAP'] for metric in observation_vector_names]) / len_obs
+    metrics_netcdf['WMSE_MAP'] = np.sum([metrics_netcdf[metric+'_WSE_MAP'].sum(skipna=False) for metric in observation_vector_names]) / len_obs
     metrics_netcdf['WSE_MAP'] = metrics_netcdf['WMSE_MAP'] * len_obs
     
     # Expand dimension for iteration
