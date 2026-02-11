@@ -62,6 +62,35 @@ def return_climate_metrics(exp_path, ave_start_day, daymax, observation_netcdf, 
                 Power = Y.var(0)
                 # Return square root of power spectrum, so the physical dimensions are metres, same as e_mean
                 metrics_data[metric] = np.sqrt(Power)
+            case "covariance_matrix":
+                # Extract interfaces
+                interfaces = prog.e.compute().astype('float64')
+                if np.isnan(interfaces).any():
+                    print('NaNs in interfaces, cannot compute power_PCA_sqrt metric')
+                    return False
+                # Scale interfaces by reduced gravity ratio
+                interfaces_scaled = ((interfaces - interfaces.mean('Time')) / observation_netcdf['g_ratio']).compute()
+                # Select time dimension length
+                Nt = interfaces_scaled.shape[0]
+                # Reshape Nz x Ny x Nx into a single dimension
+                X = interfaces_scaled.values.reshape(Nt,-1)
+                cov = 1./Nt *(X.T@X)
+                metrics_data[metric] = cov
+
+            case "covariance_matrix_4":
+                # Extract interfaces
+                interfaces = prog.e.compute().astype('float64')
+                if np.isnan(interfaces).any():
+                    print('NaNs in interfaces, cannot compute power_PCA_sqrt metric')
+                    return False
+                # Scale interfaces by reduced gravity ratio
+                interfaces_scaled = ((interfaces - interfaces.mean('Time')) / observation_netcdf['g_ratio']).compute()
+                # Select time dimension length
+                Nt = interfaces_scaled.shape[0]
+                # Reshape Nz x Ny x Nx into a single dimension
+                X = interfaces_scaled.coarsen({'xh':4, 'yh':4}).mean().values.reshape(Nt,-1)
+                cov = 1./Nt *(X.T@X)
+                metrics_data[metric] = cov
 
     prog.close()
     series.close()
@@ -122,7 +151,7 @@ def assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd,
             variance = observation_netcdf[metric_var]
             # Determine spatial dimensions for averaging/summation
             spatial_ave_dims = []
-            for dim in ['xh', 'yh', 'xq', 'yq', 'PCA']:
+            for dim in ['xh', 'yh', 'xq', 'yq', 'PCA', 'NzNyNx', 'NzNyNx_dummy', 'NzNyNx_4', 'NzNyNx_dummy_4']:
                 if dim in error.dims:
                     spatial_ave_dims.append(dim)
             
@@ -171,7 +200,7 @@ def assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd,
         error = metrics_netcdf[metric].isel(ens=slice(None,-1)).mean('ens') - observation_netcdf[metric]
         variance = observation_netcdf[metric_var]
         spatial_ave_dims = []
-        for dim in ['xh', 'yh', 'xq', 'yq', 'PCA']:
+        for dim in ['xh', 'yh', 'xq', 'yq', 'PCA', 'NzNyNx', 'NzNyNx_dummy', 'NzNyNx_4', 'NzNyNx_dummy_4']:
             if dim in error.dims:
                 spatial_ave_dims.append(dim)
         metrics_netcdf[metric+'_WSE_MAP'] = (error * error / variance).sum(spatial_ave_dims)

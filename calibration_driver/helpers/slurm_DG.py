@@ -16,7 +16,7 @@ def create_slurm(p, filename, call_function):
     '#SBATCH --ntasks-per-node='+str(p['ntasks']),
     '#SBATCH --cpus-per-task=1',
     '#SBATCH --mem='+mem,
-    '#SBATCH --time='+str(p['time'])+':00:00',
+    '#SBATCH --time='+str(p['time'])+':' + str(p['time_minutes']) + ':00',
     '#SBATCH --begin=now+'+str(p['begin']),
     '#SBATCH --job-name='+str(p['name']),
     '#SBATCH --export=NONE',
@@ -40,6 +40,8 @@ def create_slurm(p, filename, call_function):
     '    sbatch --exclude=$SLURM_JOB_NODELIST --begin=now+1minute $0',
     'fi'
     ]
+    #print(lines)
+    #print('Minutes:', p['time_minutes'])
     with open(filename,'w') as fid:
         fid.writelines([ line+'\n' for line in lines])
 
@@ -114,6 +116,7 @@ HPC = dictionary(
     ntasks=1,
     mem=0.5,
     time=24,
+    time_minutes=0,
     name='mom6',
     begin='0hour',
     partition=''

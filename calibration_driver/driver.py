@@ -92,6 +92,7 @@ for iteration in range(args.latest_iteration, config["eki"]["n_iterations"]):
             ############ Create HPC profile ######################
             hpc = HPC.add(name=config["tag"], 
                 time=config["slurm_mom6"]["time"], 
+                time_minutes=config["slurm_mom6"]["time_minutes"],
                 nodes=config["slurm_mom6"]["nodes"],
                 ntasks=config["slurm_mom6"]["ntasks"],
                 mem=config["slurm_mom6"]["mem"],
