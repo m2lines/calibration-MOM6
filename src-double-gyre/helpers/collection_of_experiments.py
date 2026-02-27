@@ -140,7 +140,7 @@ class CollectionOfExperiments:
             im = KE.isel(Layer=1).plot(ax=ax[0,1], label=labels[j], color=colors.get(exp,None), lw=lw)
             color = im[0].get_color()
             ax[0,1].axhline(y = KE_mean.isel(Layer=1), linestyle='--', color=color)
-            ax[0,1].set_ylim([-1.e+14, 1.e+15])
+            ax[0,1].set_ylim([-1.e+14, 2.e+15])
 
             im = APE.isel(Interface=0).plot(ax=ax[1,0], label=labels[j], color=colors.get(exp,None), lw=lw)
             color = im[0].get_color()
@@ -346,7 +346,7 @@ class CollectionOfExperiments:
             plt.xlabel('wavenumber $k$ [m$^{-1}$]')
             plt.ylabel('Power spectrum [m$^3$/s$^4$]')
             plt.title('')
-            
+          
     def plot_ssh(self, exps, labels=None, target=None, ncols=3, zi=0, vmax=3.0, cmap='RdBu_r', clabel=True, show_rmse=True):
         if labels is None:
             labels=exps
@@ -377,7 +377,7 @@ class CollectionOfExperiments:
                 lines = True
             else:
                 ssh = self[exp].e_mean.isel(zi=zi)
-                ssh = ssh - remesh(self[target].e_mean.isel(zi=zi),ssh)
+                ssh = ssh - self[target].e_mean.isel(zi=zi)
                 levels = levels_bias
                 label = 'SSH bias [m]'
                 lines = False
@@ -394,9 +394,11 @@ class CollectionOfExperiments:
 
             if exp != exps[-1]:
                 RMSE = Lk_error(self[exp].e_mean.isel(zi=zi),self[exps[-1]].e_mean.isel(zi=zi))[0]
+                corr = float(xr.corr(self[exp].e_mean.isel(zi=zi),self[exps[-1]].e_mean.isel(zi=zi)))
                 #print(RMSE)
                 if show_rmse:
-                    plt.text(9,31,'RMSE='+str(round(RMSE,3))+'$m$', fontsize=14)
+                    plt.text(11,33,'RMSE='+str(round(RMSE,3))+'$m$', fontsize=14)
+                    plt.text(11,31,'corr='+str(round(corr,3)), fontsize=14)
 
         plt.tight_layout()
 
@@ -419,7 +421,7 @@ class CollectionOfExperiments:
 
         for ifig, exp in enumerate(exps):
             plt.subplot(nrows,ncol,ifig+1)
-            ssh = remesh(self[exp].e_std.isel(zi=zi),self[target].e_std.isel(zi=zi))
+            ssh = self[exp].e_std.isel(zi=zi)
             if zi==0:
                 levels = np.arange(0,0.65,0.05)
             else:
@@ -434,8 +436,92 @@ class CollectionOfExperiments:
             plt.title(labels[ifig])
 
             if exp != exps[-1]:
-                RMSE = Lk_error(ssh,remesh(self[exps[-1]].e_std.isel(zi=zi), self[target].e_std.isel(zi=zi)))[0]
-                plt.text(9,31,'RMSE='+str(round(RMSE,3))+'$m$', fontsize=14, color='w')
+                RMSE = Lk_error(self[exp].e_std.isel(zi=zi),self[exps[-1]].e_std.isel(zi=zi))[0]
+                corr = float(xr.corr(self[exp].e_std.isel(zi=zi),self[exps[-1]].e_std.isel(zi=zi)))
+                plt.text(11,33,'RMSE='+str(round(RMSE,3))+'$m$', fontsize=14, color='w')
+                plt.text(11,31,'corr='+str(round(corr,3)), fontsize=14, color='w')
+
+        plt.tight_layout()
+
+    def plot_ssh_skewness(self, exps, labels=None, target=None, ncols=3, zi=0):
+        if labels is None:
+            labels=exps
+        nfig = len(exps)
+        ncol = min(ncols,nfig)
+        nrows = nfig / ncols
+        if nrows > 1:
+            nrows = int(np.ceil(nrows))
+        else:
+            nrows = 1
+
+        if target is None:
+            target = exps[-1]
+
+        plt.figure(figsize=(5*ncol,4*nrows))
+        plt.subplots_adjust(hspace=0.3, wspace=0.3)
+
+        for ifig, exp in enumerate(exps):
+            plt.subplot(nrows,ncol,ifig+1)
+            ssh = self[exp].e_3rd.isel(zi=zi)
+            if zi==0:
+                levels = np.arange(-0.4,0.45,0.05)
+            else:
+                levels = np.arange(-40,45,5)
+            label = 'SSH 3rd moment [m]'
+
+            ssh.plot.contourf(levels=levels, cmap=cmocean.cm.balance, linewidths=1, cbar_kwargs={'label': label})
+            plt.xticks((0, 5, 10, 15, 20))
+            plt.yticks((30, 35, 40, 45, 50))
+            plt.xlabel('Longitude')
+            plt.ylabel('Latitude')
+            plt.title(labels[ifig])
+
+            if exp != exps[-1]:
+                RMSE = Lk_error(self[exp].e_3rd.isel(zi=zi),self[exps[-1]].e_3rd.isel(zi=zi))[0]
+                corr = float(xr.corr(self[exp].e_3rd.isel(zi=zi),self[exps[-1]].e_3rd.isel(zi=zi)))
+                plt.text(11,33,'RMSE='+str(round(RMSE,3))+'$m$', fontsize=14, color='k')
+                plt.text(11,31,'corr='+str(round(corr,3)), fontsize=14, color='k')
+
+        plt.tight_layout()
+
+    def plot_ssh_kurtosis(self, exps, labels=None, target=None, ncols=3, zi=0):
+        if labels is None:
+            labels=exps
+        nfig = len(exps)
+        ncol = min(ncols,nfig)
+        nrows = nfig / ncols
+        if nrows > 1:
+            nrows = int(np.ceil(nrows))
+        else:
+            nrows = 1
+
+        if target is None:
+            target = exps[-1]
+
+        plt.figure(figsize=(5*ncol,4*nrows))
+        plt.subplots_adjust(hspace=0.3, wspace=0.3)
+
+        for ifig, exp in enumerate(exps):
+            plt.subplot(nrows,ncol,ifig+1)
+            ssh = self[exp].e_4th.isel(zi=zi)
+            if zi==0:
+                levels = np.arange(0,0.65,0.05)
+            else:
+                levels = np.arange(0,65,5)
+            label = 'SSH 4th moment [m]'
+
+            ssh.plot.contourf(levels=levels, cmap=cmocean.cm.balance, linewidths=1, cbar_kwargs={'label': label})
+            plt.xticks((0, 5, 10, 15, 20))
+            plt.yticks((30, 35, 40, 45, 50))
+            plt.xlabel('Longitude')
+            plt.ylabel('Latitude')
+            plt.title(labels[ifig])
+
+            if exp != exps[-1]:
+                RMSE = Lk_error(self[exp].e_4th.isel(zi=zi),self[exps[-1]].e_4th.isel(zi=zi))[0]
+                corr = float(xr.corr(self[exp].e_4th.isel(zi=zi),self[exps[-1]].e_4th.isel(zi=zi)))
+                plt.text(11,33,'RMSE='+str(round(RMSE,3))+'$m$', fontsize=14, color='w')
+                plt.text(11,31,'corr='+str(round(corr,3)), fontsize=14, color='w')
 
         plt.tight_layout()
 
@@ -551,6 +637,36 @@ class CollectionOfExperiments:
         for ifig, exp in enumerate(exps):
             plt.subplot(nrows,ncol,ifig+1)
             field = self[exp].e.isel(zi=zi,Time=idx)
+            if zi==1:
+                field = field+1000.
+            im = field.plot.imshow(vmin=-vmax, add_colorbar=False, interpolation='none')
+            plt.xticks([0,5,10,15,20])
+            plt.yticks([30,35,40,45,50])
+            plt.xlim([0,22])
+            plt.ylim([30,50])
+            plt.xlabel('Longitude')
+            plt.ylabel('Latitude')
+            plt.title(labels[ifig])
+            plt.gca().set_aspect(1)
+        
+        cbar = plt.colorbar(im, ax=plt.gcf().axes, extend='both')
+        cbar.set_label(label='Sea surface height [m]' , fontsize=14)
+
+    def plot_ssh_anomaly(self, exps, labels=None, idx=-1, ncols=3, zi=0, vmax=1):
+        if labels is None:
+            labels=exps
+        nfig = len(exps)
+        ncol = min(ncols,nfig)
+        nrows = nfig / ncols
+        if nrows > 1:
+            nrows = int(np.ceil(nrows))
+        else:
+            nrows = 1
+        plt.figure(figsize=(5*ncol,4*nrows))
+        plt.subplots_adjust(hspace=0.3, wspace=0.3)
+        for ifig, exp in enumerate(exps):
+            plt.subplot(nrows,ncol,ifig+1)
+            field = self[exp].e.isel(zi=zi,Time=idx) - self[exp].ssh_mean
             if zi==1:
                 field = field+1000.
             im = field.plot.imshow(vmin=-vmax, add_colorbar=False, interpolation='none')

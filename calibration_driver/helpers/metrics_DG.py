@@ -19,6 +19,10 @@ def return_climate_metrics(exp_path, ave_start_day, daymax, observation_netcdf, 
     if daymax not in series.Time:
         return False
 
+    e = prog.e
+    e_mean = e.mean('Time').compute()
+    e_anom = (e - e_mean).compute()
+
     metrics_data = {}
     for metric in metrics:
         match metric:
@@ -31,25 +35,46 @@ def return_climate_metrics(exp_path, ave_start_day, daymax, observation_netcdf, 
             case "APE_std":
                 metrics_data[metric] = series.APE.std('Time').values
             case "e_mean":
-                metrics_data[metric] = prog.e.mean('Time').values
+                metrics_data[metric] = e_mean.values
             case "e_std":
-                metrics_data[metric] = prog.e.std('Time').values
+                metrics_data[metric] = np.sqrt((e_anom * e_anom).mean('Time')).values
+            case "e_3rd":
+                metrics_data[metric] = np.cbrt((e_anom * e_anom * e_anom).mean('Time')).values
+            case "e_4th":
+                metrics_data[metric] = np.sqrt(np.sqrt((e_anom * e_anom * e_anom * e_anom).mean('Time'))).values
             case "u_mean":
-                metrics_data[metric] = prog.u.mean('Time').values
+               metrics_data[metric] = prog.u.mean('Time').values
             case "v_mean":
-                metrics_data[metric] = prog.v.mean('Time').values
+               metrics_data[metric] = prog.v.mean('Time').values
             case "u_std":
-                metrics_data[metric] = prog.u.std('Time').values
+               metrics_data[metric] = prog.u.std('Time').values
             case "v_std":
-                metrics_data[metric] = prog.v.std('Time').values
-            case "power_PCA_sqrt":
-                # Extract interfaces
-                interfaces = prog.e.compute().astype('float64')
-                if np.isnan(interfaces).any():
-                    print('NaNs in interfaces, cannot compute power_PCA_sqrt metric')
-                    return False
+               metrics_data[metric] = prog.v.std('Time').values
+            case "cov_fro_distance_10":
                 # Scale interfaces by reduced gravity ratio
-                interfaces_scaled = ((interfaces - interfaces.mean('Time')) / observation_netcdf['g_ratio']).compute()
+                interfaces_scaled = (e_anom / observation_netcdf['g_ratio']).compute().astype('float64')
+                # Select time dimension length
+                Nt = interfaces_scaled.shape[0]
+                # Reshape Nz x Ny x Nx into a single dimension
+                X = interfaces_scaled.values.reshape(Nt,-1)
+                svd_X = np.linalg.svd(X, full_matrices=False)
+                rank = 10
+                
+                distance = 0
+                distance += (svd_X.S[:rank]**4).sum() / Nt**2
+                distance += (observation_netcdf['PCA_S2_over_Nt'][:rank].values**2).sum()
+                R = svd_X.Vh[:rank] @ observation_netcdf['PCA_Vh'].transpose('PCA','NzNyNx')[:rank].values.T
+                Sigma_X = np.diag(svd_X.S[:rank])**2
+                Sigma_Y = np.diag(observation_netcdf['PCA_S2_over_Nt'][:rank].values)
+                #print('R shape: ', R.shape)
+                #print(Sigma_X.shape)
+                #print(Sigma_Y.shape)
+                distance -= 2 * np.trace(Sigma_X @ R @ Sigma_Y @ R.T) / Nt
+                metrics_data[metric] = np.sqrt(distance)
+                
+            case "power_PCA_sqrt":
+                # Scale interfaces by reduced gravity ratio
+                interfaces_scaled = (e_anom / observation_netcdf['g_ratio']).compute().astype('float64')
                 # Select time dimension length
                 Nt = interfaces_scaled.shape[0]
                 # Reshape Nz x Ny x Nx into a single dimension
@@ -62,14 +87,10 @@ def return_climate_metrics(exp_path, ave_start_day, daymax, observation_netcdf, 
                 Power = Y.var(0)
                 # Return square root of power spectrum, so the physical dimensions are metres, same as e_mean
                 metrics_data[metric] = np.sqrt(Power)
+
             case "covariance_matrix":
-                # Extract interfaces
-                interfaces = prog.e.compute().astype('float64')
-                if np.isnan(interfaces).any():
-                    print('NaNs in interfaces, cannot compute power_PCA_sqrt metric')
-                    return False
                 # Scale interfaces by reduced gravity ratio
-                interfaces_scaled = ((interfaces - interfaces.mean('Time')) / observation_netcdf['g_ratio']).compute()
+                interfaces_scaled = (e_anom / observation_netcdf['g_ratio']).compute().astype('float64')
                 # Select time dimension length
                 Nt = interfaces_scaled.shape[0]
                 # Reshape Nz x Ny x Nx into a single dimension
@@ -78,13 +99,8 @@ def return_climate_metrics(exp_path, ave_start_day, daymax, observation_netcdf, 
                 metrics_data[metric] = cov
 
             case "covariance_matrix_4":
-                # Extract interfaces
-                interfaces = prog.e.compute().astype('float64')
-                if np.isnan(interfaces).any():
-                    print('NaNs in interfaces, cannot compute power_PCA_sqrt metric')
-                    return False
                 # Scale interfaces by reduced gravity ratio
-                interfaces_scaled = ((interfaces - interfaces.mean('Time')) / observation_netcdf['g_ratio']).compute()
+                interfaces_scaled = (e_anom / observation_netcdf['g_ratio']).compute().astype('float64')
                 # Select time dimension length
                 Nt = interfaces_scaled.shape[0]
                 # Reshape Nz x Ny x Nx into a single dimension
@@ -94,6 +110,8 @@ def return_climate_metrics(exp_path, ave_start_day, daymax, observation_netcdf, 
 
     prog.close()
     series.close()
+    del e_mean
+    del e_anom
     return metrics_data
 
 def assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd, iteration,
@@ -209,9 +227,11 @@ def assemble_G_matrix_and_store_metrics(iteration_path, optimization_folder_pwd,
     metrics_netcdf['WSE_MAP'] = metrics_netcdf['WMSE_MAP'] * len_obs
     
     # Expand dimension for iteration
-    metrics_netcdf = metrics_netcdf.expand_dims(iter=[iteration]).transpose('iter', 'ens',...)
+    metrics_netcdf = metrics_netcdf.expand_dims(iter=[iteration]).transpose('iter', 'ens',...).astype('float32').compute()
+    print('Metrics are computed')
 
-    metrics_netcdf.astype('float32').to_netcdf(f'{optimization_folder_pwd}/metrics_{iteration:02d}.nc')
+    metrics_netcdf.to_netcdf(f'{optimization_folder_pwd}/metrics_{iteration:02d}.nc')
+    print('Metrics are saved to file')
 
     del metrics_netcdf
 

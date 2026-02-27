@@ -297,6 +297,16 @@ class Experiment:
     def e_std(self):
         return self.e.sel(Time=self.Averaging_time).std(dim='Time')
 
+    @netcdf_property
+    def e_3rd(self):
+        x = ((self.e.sel(Time=self.Averaging_time) - self.e_mean)**3).mean('Time')
+        x = np.sign(x) * np.abs(x)**(1./3.)
+        return x
+
+    @netcdf_property
+    def e_4th(self):
+        return (((self.e.sel(Time=self.Averaging_time) - self.e_mean)**4).mean('Time'))**(1./4.)
+
     def average(self, prop):
         return eval(f'self.{prop}').sel(Time=self.Averaging_time).mean(dim='Time')
 

@@ -184,7 +184,7 @@ def default_rcParams(kw={}):
 
         'axes.formatter.limits': (-2,3),
         'axes.formatter.use_mathtext': True,
-        'axes.labelpad': 0,
+        'axes.labelpad': 4,
         'axes.titlelocation' : 'center',
         
         'savefig.bbox': 'tight',
