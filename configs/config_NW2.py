@@ -1,0 +1,75 @@
+tag: "nw2g"
+
+paths:
+  base: "/scratch/pp2681/mom6/Neverworld2/calibration/1800days"
+  optimization_folder: "gprime_n"
+  ann: "/scratch/pp2681/mom6/CM26_ML_models/ocean3d/subfilter/FGR3/equivariant/learning_rate/N8-forcing-fluxes/0.05/model/"
+  observation: "/home/pp2681/calibration/scripts/R32_R2_FGR3_NW2/800days_v4.nc"
+  executable: "/scratch/pp2681/MOM6-examples/build/compiled_executables/MOM6-WENO-ANN-boundary"
+  configuration: "/home/pp2681/MOM6-examples/build/configurations/NW2_1800"
+  noise_model: None
+  #noise_model: "/scratch/pp2681/mom6/CM26_Double_Gyre/calibration/20-years/noise_model/metrics_00.nc"
+  prior_cov: None
+  #prior_cov: "/home/pp2681/calibration/scripts/priors/weights2_biases2_Cxx_prior_cond_100.npy"
+
+eki:
+  n_iterations: 8
+  ens_size: 200
+  ens_spread: 0.25
+  seed: 11
+  seed_julia: 12
+  outlier_scale: 10
+  diag_noise_trace_ratio: 1.
+  svd_noise_trace_ratio: 0.
+  sigma2: 1.0
+  inversion: "TransformInversion()"
+  scheduler: "DefaultScheduler(0.025)"
+  trainable_parameters: ["weights2", "biases2"]
+  trainable_parameters_mom6:
+    ZB_SCALING:
+      mean: 1.0
+      std: 0.25
+  parameter_mask: None
+  #  weights2:
+  #    [0., 0., 1., 0., 1., 1., 0., 0., 0., 0., 0., 1.]
+  #  biases2:
+  #    [1.]
+  ave_start_day: 1000.
+  observation_vector: ["e_mean", "e_std"]
+  gamma_vector: ["e_mean_var_gratio_n", "e_std_var_gratio_n"]
+  observation_validation: ["e_mean", "e_std", "e_3rd", "e_4th", "KE_mean", "KE_std", "APE_mean", "APE_std"]
+  gamma_validation: ["e_mean_var_gratio_n", "e_std_var_gratio_n", "e_3rd_var_gratio_n", "e_4th_var_gratio_n", "KE_mean_var_loss", "KE_std_var_loss", "APE_mean_var_loss", "APE_std_var_loss"]
+  metrics_function: "return_climate_metrics"
+
+mom6_namelist:
+  NIGLOBAL: 120
+  NJGLOBAL: 280
+  DT: 900.
+  HMIX_UV_SFC_PROP: 5.0
+  INTERNAL_WAVE_SPEED_BETTER_EST: False
+  SMAG_BI_CONST: 0.06
+  DAYMAX: 1800.
+  USE_ZB2020: "True"
+  ZB2020_USE_ANN: "True"
+  ZB2020_ANN_FILE_TALL: "INPUT/Tall.nc"
+  USE_CIRCULATION_IN_HORVISC: "True"
+  ZB_SCALING: 1.0
+  BOUND_CORIOLIS_BIHARM: True
+  ZB_KLOWER_R_DISS: 1.
+  ZB_BOUNDARY_DISCARD: 2
+  U_TRUNC_FILE: "U_velocity_truncations"
+  V_TRUNC_FILE: "V_velocity_truncations"
+
+slurm_eki: "sbatch --time=02:00:00 --cpus-per-task=4 --mem=32GB"
+
+slurm_mom6:
+  time: 2
+  time_minutes: 0
+  nodes: 1
+  ntasks: 32
+  mem: 10
+  partition: "#SBATCH --partition=cs"
+
+singularity_command: "singularity exec --nv --overlay /scratch/$USER/python-container/python-overlay.ext3:ro --bind /scratch/pp2681/python-container/escnn-cache:/ext3/miniconda3/lib/python3.11/site-packages/escnn/group/_cache/ /share/apps/images/cuda12.3.2-cudnn9.0.0-ubuntu-22.04.4.sif"
+
+#singularity_command: "singularity exec --nv --overlay /scratch/$USER/python-container/python-overlay.ext3:ro --bind /scratch/pp2681/python-container/escnn-cache:/ext3/miniconda3/lib/python3.11/site-packages/escnn/group/_cache/ /scratch/work/public/singularity/cuda11.6.124-cudnn8.4.0.27-devel-ubuntu20.04.4.sif "
