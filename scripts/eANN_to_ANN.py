@@ -1,7 +1,6 @@
 import sys
-sys.path.append('/home/pp2681/ANN-momentum-mesoscale/src/training-on-CM2.6')
 
-from helpers.ann_tools import ANN_equivariant, equivariant_to_regular_ANN, export_ANN, import_ANN
+from ann_tools import ANN_equivariant, equivariant_to_regular_ANN, export_ANN, import_ANN
 import argparse
 import xarray as xr
 import torch
