@@ -1,0 +1,5 @@
+{
+    "hidden_layer_size": 64,
+    "stencil_size": 3,
+    "symmetry": "flipRot2dOnR2_N8"
+}
